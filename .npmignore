@@ -1,0 +1,13 @@
+# Folders
+src
+tests
+.github
+.changeset
+
+# Files
+bun.lockb
+yarn.lock
+tsup.config.ts
+tsconfig.json
+.eslintrc.json
+CONTRIBUTING.md
