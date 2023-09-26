@@ -11,19 +11,13 @@ type AnySchemaBuilder =
   | BooleanSchemaBuilder
   | NullSchemaBuilder
   | ObjectSchemaBuilder
+  | RecordSchemaBuilder
   | ArraySchemaBuilder
   | TupleSchemaBuilder
   | EnumSchemaBuilder
   | ConstantSchemaBuilder
   | UnionSchemaBuilder
   | IntersectionSchemaBuilder
-
-function assertAjv(instance: unknown): asserts instance is Ajv {
-  if (!(instance instanceof Ajv)) {
-    throw new Error(`Cannot work for non Ajv class instance. Call "new Ajv()" or use default value.`)
-  }
-}
-
 
 type IsFloat<N extends number | string> = N extends number
   ? IsFloat<`${N}`>
@@ -121,7 +115,7 @@ abstract class SchemaBuilder<
     return this as never
   }
 
-  private preFns: Function[] = []
+  private preFns: { fn: Function, schema: AnySchemaBuilder }[] = []
 
   /**
    * Add preprocess function for incoming result.
@@ -135,28 +129,28 @@ abstract class SchemaBuilder<
    *   }
    *  // do nothing if not a date
    *   return v
-   * })
+   * }, s.string()) // add string schema validation
    * const res = myString.parse(new Date()) // '2023-09-23T07:10:57.881Z'
    * const res = myString.parse('qwe') // 'qwe'
    * const res = myString.parse({}) // error: not a string
    */
-  preprocess<In = Input>(fn: (value: unknown) => In): SchemaBuilder<In, Schema, Output> {
+  preprocess<S extends AnySchemaBuilder = AnySchemaBuilder>(fn: (x: unknown) => unknown, s: S): S {
     if (typeof fn !== 'function') {
       throw new TypeError(`Cannot use not a function for pre processing.`, { cause: { type: typeof fn, value: fn } })
     }
-    this.preFns.push(fn)
+    this.preFns.push({ fn, schema: s })
     return this as never
   }
 
-  private postFns: Function[] = []
+  private postFns: { fn: Function, schema: AnySchemaBuilder }[] = []
   /**
    * Post process. Use it when you would like to transform result after parsing is happens
    */
-  postprocess<Out = Output>(fn: (input: Input) => Out): SchemaBuilder<Input, Schema, Out> {
+  postprocess<S extends AnySchemaBuilder = AnySchemaBuilder>(fn: (input: Input) => unknown, schema: S): S {
     if (typeof fn !== 'function') {
       throw new TypeError(`Cannot use not a function for pre processing.`, { cause: { type: typeof fn, value: fn } })
     }
-    this.postFns.push(fn)
+    this.postFns.push({ fn, schema })
     return this as never
   }
 
@@ -195,12 +189,25 @@ abstract class SchemaBuilder<
    * It also allies your `postProcess` functions if parsing was successfull
    */
   safeParse(input: unknown): SafeParseResult<Output> {
+    // need to remove schema, or we get precompiled result. It's bad for `extend` and `merge` in object schema
     this.ajv.removeSchema(this.schema)
     let transformed;
     if (Array.isArray(this.preFns) && this.preFns.length > 0) {
-      transformed = this.preFns.reduce((prevResult, fn) => {
-        return fn(prevResult)
-      }, input)
+      try {
+        transformed = this.preFns.reduce((prevResult, { fn, schema }) => {
+          const result = schema.safeParse(fn(prevResult))
+          if (result.success) {
+            return result.data
+          }
+          throw result.error
+        }, input)
+      } catch (e) {
+        return {
+          success: false,
+          error: new Error((e as Error).message, { cause: e }),
+          input,
+        }
+      }
     } else {
       transformed = input
     }
@@ -226,8 +233,12 @@ abstract class SchemaBuilder<
         }
       }
       if (Array.isArray(this.postFns) && this.postFns.length > 0) {
-        const output = this.postFns.reduce((prevResult, fn) => {
-          return fn(prevResult)
+        const output = this.postFns.reduce((prevResult, { fn, schema }) => {
+          const result = schema.safeParse(fn(prevResult))
+          if (result.success) {
+            return result.data
+          }
+          throw result.error
         }, transformed)
         return {
           success: true,
@@ -455,6 +466,9 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema, string> {
   ) {
     this.schema.minLength = value as L
     return this
+  }
+  nonEmpty() {
+    return this.minLength(1)
   }
 
   format(formatType: StringSchema['format']) {
@@ -712,6 +726,31 @@ function object<
 >(def: Definitions) {
   return new ObjectSchemaBuilder<Definitions>(def)
 }
+
+class RecordSchemaBuilder<ValueDef extends AnySchemaBuilder = AnySchemaBuilder> extends SchemaBuilder<Record<string, Infer<ValueDef>>, ObjectSchema>{
+  protected precheck(arg: unknown): arg is Record<string | number, Infer<ValueDef>> {
+    if (typeof arg === 'object' && arg !== null) {
+      return true;
+    }
+    if (this.isNullable && (arg === null || arg === undefined)) {
+      return true;
+    }
+    return false
+  }
+
+  constructor(def: ValueDef) {
+    super({
+      type: 'object',
+      additionalProperties: def.schema
+    })
+  }
+
+}
+
+function record<Def extends AnySchemaBuilder>(valueDef: Def) {
+  return new RecordSchemaBuilder<Def>(valueDef)
+}
+
 
 class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder<
   T,
@@ -1063,6 +1102,7 @@ function create(ajv: Ajv) {
     enum: injectAjv(ajv, makeEnum) as typeof makeEnum,
     boolean: injectAjv(ajv, boolean) as typeof boolean,
     object: injectAjv(ajv, object) as typeof object,
+    record: injectAjv(ajv, record) as typeof record,
     array: injectAjv(ajv, array) as typeof array,
     tuple: injectAjv(ajv, tuple) as typeof tuple,
     const: injectAjv(ajv, constant) as typeof constant,
@@ -1083,6 +1123,7 @@ export {
   boolean,
   nil as null,
   object,
+  record,
   array,
   tuple,
   constant as const,

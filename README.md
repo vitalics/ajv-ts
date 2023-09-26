@@ -15,13 +15,12 @@ We inspired API from `zod`. So you just can reimport you api and that's it!
 
 ## Zod unsupported APIs/differences
 
-1. transformations(refine, superRefine). But you can use `preprocess` and `postprocess`.
-2. `s.date`, `s.symbol`, `s.void`, `s.void`, `s.never`, `s.bigint`. Since JSON-schema doesn't define `Date`, `Symbol`, `void`, `never` as separate type. Use `s.string().format('date-time')` or other JSON-string format compatibility: https://json-schema.org/understanding-json-schema/reference/string.html
-3. `s.null` === `s.undefined` - same types, but helps typescript with autocompletion
-4. `s.enum` and `s.nativeEnum` it's a same as `s.enum`. We make enums fully compatible, it can be array of strings or structure defined with `enum` keyword in typescript
-5. Exporting `s` isntead of `z`, since `s` - is a shorthand for `schema`
-6. `s.custom` is not supported
-7. `s.literal` === `s.const`.
+1. `s.date`, `s.symbol`, `s.void`, `s.void`, `s.never`, `s.bigint`, `s.function` does not supported. Since JSON-schema doesn't define `Date`, `Symbol`, `void`, `never`, `function`, `Set`, `Map` as separate type. For strings you can use `s.string().format('date-time')` or other JSON-string format compatibility: https://json-schema.org/understanding-json-schema/reference/string.html
+2. `s.null` === `s.undefined` - same types, but helps typescript with autocompletion
+3. `z.enum` and `z.nativeEnum` it's a same as `s.enum`. We make enums fully compatible, it can be array of strings or structure defined with `enum` keyword in typescript
+4. Exporting `s` isntead of `z`, since `s` - is a shorthand for `schema`
+5. `z.custom` is not supported
+6. `z.literal` === `s.const`.
 
 ## Installation
 
@@ -587,16 +586,22 @@ Not supported
 
 ### Preprocess
 
-function thant will be applied before calling `parse` method.
+function thant will be applied before calling `parse` method, It can helps you to modify incomining data
 
 Be careful with this information
 
 ```ts
-const ToString = s.number().preprocess(x => String(x))
+const ToString = s.string().preprocess(x => {
+  if(x instanceof Date){
+    return x.toISOString()
+  }
+  return x
+}, s.string())
 
-ToString.parse(12) // error: in parse we get "12"
+ToString.parse(12) // error: expects a string
 
-ToString.parse({}) // error: in parse we get "[object Object]"
+ToString.parse(new Date()) // 2023-09-26T13:44:46.497Z
+
 ```
 
 ### Postprocess
@@ -604,9 +609,9 @@ ToString.parse({}) // error: in parse we get "[object Object]"
 function thant will be applied after calling `parse` method.
 
 ```ts
-const ToString = s.number().postprocess(x => String(x))
+const ToString = s.number().postprocess(x => String(x), s.string())
 
-ToString.parse(12) // after parse we get "12"
+ToString.parse(12) // after parse we get "12" 12 => "12". 
 
-ToString.parse({}) // error: expects number.
+ToString.parse({}) // error: expects number. Postprocess has not been called
 ```
