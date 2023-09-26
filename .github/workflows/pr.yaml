@@ -1,0 +1,19 @@
+name: Pull Request - Build
+on:
+  # Triggers the workflow on push or pull request events but only for the develop branch
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+      - uses: oven-sh/setup-bun@v1
+      - run: bun install
+      - name: Generate build
+        run: bun run build
+      - name: Run Tests
+        run: bun run test
