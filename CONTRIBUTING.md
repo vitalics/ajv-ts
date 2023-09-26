@@ -9,11 +9,11 @@ bun install
 ## Test
 
 ```bash
-bun test
+bun run test
 ```
 
 ## Build
 
 ```bash
-bun build
+bun run build
 ```

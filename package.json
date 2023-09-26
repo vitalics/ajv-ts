@@ -6,8 +6,12 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsup",
-    "test": "bun test"
+    "test": "bun test",
+    "ci:version": "changeset version && bun install --no-frozen-lockfile",
+    "ci:publish": "changeset publish"
   },
+  "author": "Vitali Haradkou <vitalicset@yandex.ru>",
+  "license": "Apache-2.0",
   "exports": {
     ".": {
       "import": {
