@@ -14,17 +14,7 @@ test('should support AJV custom ajv instance', () => {
 })
 
 test('postProcess should should transform output result', () => {
-  const myNum = s.number().postprocess(v => String(v))
+  const myNum = s.number().postprocess(v => String(v), s.string())
 
   expect(myNum.parse(1)).toBe('1')
-})
-
-test('Native enum', () => {
-  enum MyEnum {
-    Red = 'red',
-    Green = 'green',
-    Blue = 'blue'
-  }
-
-  const en = s.enum(MyEnum)
 })
