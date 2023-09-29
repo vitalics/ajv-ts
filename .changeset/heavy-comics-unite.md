@@ -2,4 +2,5 @@
 "ajv-ts": patch
 ---
 
-fix minLength for string schema
+Reduce bundle size
+fix string minLength schema builder
