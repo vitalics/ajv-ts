@@ -115,7 +115,7 @@ abstract class SchemaBuilder<
     return this as never
   }
 
-  private preFns: { fn: Function, schema: AnySchemaBuilder }[] = []
+  private preFns: Function[] = []
 
   /**
    * Add preprocess function for incoming result.
@@ -134,12 +134,12 @@ abstract class SchemaBuilder<
    * const res = myString.parse('qwe') // 'qwe'
    * const res = myString.parse({}) // error: not a string
    */
-  preprocess<S extends AnySchemaBuilder = AnySchemaBuilder>(fn: (x: unknown) => unknown, s: S): S {
+  preprocess(fn: (x: unknown) => unknown) {
     if (typeof fn !== 'function') {
       throw new TypeError(`Cannot use not a function for pre processing.`, { cause: { type: typeof fn, value: fn } })
     }
-    this.preFns.push({ fn, schema: s })
-    return this as never
+    this.preFns.push(fn)
+    return this
   }
 
   private postFns: { fn: Function, schema: AnySchemaBuilder }[] = []
@@ -153,7 +153,6 @@ abstract class SchemaBuilder<
     this.postFns.push({ fn, schema })
     return this as never
   }
-
 
   protected abstract precheck(arg: unknown): arg is Input
 
@@ -178,6 +177,7 @@ abstract class SchemaBuilder<
     return this
   }
 
+  /** Define default value */
   default(value: Output) {
     (this.schema as AnySchema).default = value
     return this;
@@ -186,7 +186,7 @@ abstract class SchemaBuilder<
   /**
    * Parse you input result. Used `ajv.validate` under the hood
    * 
-   * It also allies your `postProcess` functions if parsing was successfull
+   * It also applies your `postProcess` functions if parsing was successfull
    */
   safeParse(input: unknown): SafeParseResult<Output> {
     // need to remove schema, or we get precompiled result. It's bad for `extend` and `merge` in object schema
@@ -194,12 +194,8 @@ abstract class SchemaBuilder<
     let transformed;
     if (Array.isArray(this.preFns) && this.preFns.length > 0) {
       try {
-        transformed = this.preFns.reduce((prevResult, { fn, schema }) => {
-          const result = schema.safeParse(fn(prevResult))
-          if (result.success) {
-            return result.data
-          }
-          throw result.error
+        transformed = this.preFns.reduce((prevResult, fn) => {
+          return fn(prevResult)
         }, input)
       } catch (e) {
         return {
@@ -313,9 +309,7 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
     return this.schema.maximum || this.schema.exclusiveMaximum as number || null
   }
 
-  min(value: number, exclusive = false) {
-    return this.minimum(value, exclusive)
-  }
+  min = this.minimum
   minimum(value: number, exclusive = false) {
     if (exclusive) {
       this.schema.exclusiveMinimum = value
@@ -342,9 +336,7 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
     return this
   }
 
-  max(value: number, exclusive = false) {
-    return this.maximum(value, exclusive)
-  }
+  max = this.maximum
   /**
    * marks you number maximum value
    */
@@ -442,6 +434,9 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema, string> {
     super({ type: 'string' })
   }
 
+  /**
+   * Define minimum string length
+   */
   minLength<L extends number, Valid = IsPositiveInteger<L>>(
     value: Valid extends true
       ? L
@@ -455,6 +450,9 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema, string> {
     return this
   }
 
+  /**
+   * Define maximum string length
+   */
   maxLength<L extends number, Valid = IsPositiveInteger<L>>(
     value: Valid extends true
       ? L
@@ -464,9 +462,33 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema, string> {
         `Received: '${L}'`,
       ],
   ) {
-    this.schema.minLength = value as L
+    this.schema.maxLength = value as L
     return this
   }
+  /**
+   * Define exact string length
+   * @see {@link StringSchemaBuilder.minLength minLength}
+   * @see {@link StringSchemaBuilder.maxLength maxLength}
+   * @example
+   * const exactStr = s.string().length(3)
+   * exactStr.parse('qwe') //Ok
+   * exactStr.parse('qwer') // Error
+   * exactStr.parse('go') // Error
+   */
+  length<L extends number, Valid = IsPositiveInteger<L>>(
+    value: Valid extends true
+      ? L
+      : [
+        never,
+        'Type Error. Only Positive and non floating numbers are supported.',
+        `Received: '${L}'`,
+      ],
+  ) {
+    return this.maxLength(value).minLength(value)
+  }
+  /** 
+   * Define non empty string. Same as `minLength(1)`
+   */
   nonEmpty() {
     return this.minLength(1)
   }
@@ -819,6 +841,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
   }
   /**
    * Must contain more items or equal than declared
+   *
    * @see {@link ArraySchemaBuilder.length}
    * @see {@link ArraySchemaBuilder.maxLength}
    * @example

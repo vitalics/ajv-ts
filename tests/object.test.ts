@@ -7,8 +7,13 @@ const Test = s.object({
   f1: s.number(),
   f2: s.string().optional(),
   f3: s.string().nullable(),
-  f4: s.array(s.object({ t: s.union([s.string(), s.boolean()]) }))
-}).strict();
+  f4: s.array(
+    s.object({
+      t: s.union([s.string(), s.boolean()])
+    })
+  )
+});
+
 type Test = s.infer<typeof Test>;
 
 test("object type inference", () => {
