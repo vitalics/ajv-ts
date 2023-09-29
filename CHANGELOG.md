@@ -1,5 +1,11 @@
 # ajv-ts
 
+## 0.1.3
+
+### Patch Changes
+
+- 8f48260: add js doc
+
 ## 0.1.2
 
 ### Patch Changes
