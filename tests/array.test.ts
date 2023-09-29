@@ -26,19 +26,19 @@ test("passing validations", () => {
     ],
     minItems: 2
   })
-  // minTwo.compile(["a", "a"]);
-  // minTwo.compile(["a", "a", "a"]);
-  // maxTwo.compile(["a", "a"]);
-  // maxTwo.compile(["a"]);
-  // justTwo.compile(["a", "a"]);
-  // intNum.compile(["a"]);
-  // nonEmptyMax.compile(["a"]);
+  minTwo.parse(["a", "a"]);
+  minTwo.parse(["a", "a", "a"]);
+  maxTwo.parse(["a", "a"]);
+  maxTwo.parse(["a"]);
+  justTwo.parse(["a", "a"]);
+  intNum.parse(["a"]);
+  nonEmptyMax.parse(["a"]);
 });
 
 
 test("get element", () => {
   justTwo.element.schema;
-  // expect(() => justTwo.element.compile(12)).toThrow();
+  expect(() => justTwo.element.parse(12)).toThrow();
 });
 
 test("parse should fail given sparse array", () => {
