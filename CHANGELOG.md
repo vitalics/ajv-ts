@@ -1,5 +1,12 @@
 # ajv-ts
 
+## 0.1.2
+
+### Patch Changes
+
+- 267b36a: Reduce bundle size
+  fix string minLength schema builder
+
 ## 0.1.1
 
 ### Patch Changes
