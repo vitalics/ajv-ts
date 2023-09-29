@@ -5,6 +5,7 @@ import type { UnionToTuple, UnionToIntersection, RequiredByKeys, OptionalUndefin
 import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './types'
 
 export const DEFAULT_AJV = addFormats(new Ajv())
+/** Any schema builder. */
 type AnySchemaBuilder =
   | NumberSchemaBuilder
   | StringSchemaBuilder
@@ -129,7 +130,7 @@ abstract class SchemaBuilder<
    *   }
    *  // do nothing if not a date
    *   return v
-   * }, s.string()) // add string schema validation
+   * })
    * const res = myString.parse(new Date()) // '2023-09-23T07:10:57.881Z'
    * const res = myString.parse('qwe') // 'qwe'
    * const res = myString.parse({}) // error: not a string
@@ -395,6 +396,7 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   nonpositive() {
     return this.lte(0)
   }
+  /** Marks incoming number between `MAX_SAFE_INTEGER` and `MIN_SAFE_INTEGER` */
   safe() {
     return this.lte(Number.MAX_SAFE_INTEGER).gte(Number.MIN_SAFE_INTEGER)
   }
@@ -419,15 +421,15 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema, string> {
     return false
   }
 
-  pattern<Prefix extends string = string, Postfix extends string = string>(
+  pattern<Pattern extends string = string>(
     regex: RegExp | string,
-  ): SchemaBuilder<string, StringSchema, `${Prefix}${Postfix}`> {
+  ): SchemaBuilder<string, StringSchema, `${Pattern}`> {
     if (typeof regex === 'string') {
       this.schema.pattern = `^${regex}$`
     } else {
       this.schema.pattern = `^${regex.source}$`
     }
-    return this as SchemaBuilder<string, StringSchema, `${Prefix}${Postfix}`>
+    return this as SchemaBuilder<string, StringSchema, `${Pattern}`>
   }
 
   constructor() {
@@ -507,7 +509,6 @@ function string() {
 }
 
 class BooleanSchemaBuilder extends SchemaBuilder<boolean, BooleanSchema> {
-  // eslint-disable-next-line class-methods-use-this
   protected precheck(arg: unknown): arg is boolean {
     if (typeof arg === 'boolean') {
       return true
@@ -531,11 +532,10 @@ function boolean() {
 class NullSchemaBuilder extends SchemaBuilder<null, NullSchema> {
   constructor() {
     super({ type: 'null' })
-    this.nullable()
   }
 
   protected precheck(arg: unknown): arg is null {
-    if ((arg === null || arg === undefined) && this.isNullable) {
+    if (arg === null || arg === undefined) {
       return true
     }
     return false
@@ -691,9 +691,9 @@ class ObjectSchemaBuilder<
    * name: z.string(),
    * ingredients: z.array(z.string()),
    * });
-   * const JustTheName = Recipe.pick({ name: true });
-   * type JustTheName = z.infer<typeof JustTheName>;
-   * // => { name: string }
+   * const JustTheNameAndId = Recipe.pick('name', 'id');
+   * type JustTheName = z.infer<typeof JustTheNameAndId>;
+   * // => { name: string, id: string }
    */
   pick<K extends keyof T, Keys extends K[] = K[]>(...keys: Keys): ObjectSchemaBuilder<Definition, Pick<T, Keys[number]>> {
     const picked: Record<string, any> = {}
@@ -769,6 +769,12 @@ class RecordSchemaBuilder<ValueDef extends AnySchemaBuilder = AnySchemaBuilder> 
 
 }
 
+/** 
+ * Same as `object` but less strict for properties. 
+ * 
+ * Same as `object({}).passthrough()`
+ * @see {@link object}
+ */
 function record<Def extends AnySchemaBuilder>(valueDef: Def) {
   return new RecordSchemaBuilder<Def>(valueDef)
 }
@@ -1159,6 +1165,7 @@ export {
   any,
   type Infer as infer,
   type Input as input,
+  type AnySchemaBuilder as AnySchema,
 }
 
 /**
