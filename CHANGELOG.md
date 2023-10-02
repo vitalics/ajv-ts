@@ -1,5 +1,11 @@
 # ajv-ts
 
+## 0.1.4
+
+### Patch Changes
+
+- 4e7615f: remove extra dependencies
+
 ## 0.1.3
 
 ### Patch Changes
