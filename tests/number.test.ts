@@ -107,3 +107,18 @@ test('number builder "int32" format should supports only integers', () => {
   expect(schema.validate(400)).toBe(false)
   expect(schema.validate(12.4)).toBe(false)
 })
+
+test('integer should supports only integers', () => {
+  const schema = s.integer().maximum(300)
+
+  expect(schema.schema).toMatchObject({
+    type: 'integer',
+  })
+  expect(schema.validate("qwe")).toBe(false)
+  expect(schema.validate({})).toBe(false)
+  expect(schema.validate(null)).toBe(false)
+  expect(schema.validate(() => { })).toBe(false)
+  expect(schema.validate(123)).toBe(true)
+  expect(schema.validate(400)).toBe(false)
+  expect(schema.validate(12.4)).toBe(false)
+})

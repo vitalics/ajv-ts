@@ -1,5 +1,6 @@
 {
   "name": "ajv-ts",
+  "description": "JSON-schema builder with typescript safety",
   "version": "0.1.4",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
@@ -12,6 +13,13 @@
   },
   "author": "Vitali Haradkou <vitalicset@yandex.ru>",
   "homepage": "https://github.com/vitalics/ajv-ts/README.md",
+  "keywords": [
+    "ajv",
+    "validation",
+    "json-schema",
+    "typescript",
+    "builder"
+  ],
   "bugs": {
     "url": "https://github.com/vitalics/ajv-ts/issues",
     "email": "vitalicset@yandex.ru"

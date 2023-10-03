@@ -8,13 +8,11 @@ const maxTwo = s.array(s.string()).maxLength(2);
 const justTwo = s.array(s.string()).length(2);
 const intNum = s.array(s.string()).nonEmpty();
 const nonEmptyMax = s.array(s.string()).nonEmpty().maxLength(2);
-
 type t1 = s.infer<typeof nonEmptyMax>;
 assertEqualType<[string, ...string[]], t1>(true);
 
 type t2 = s.infer<typeof minTwo>;
 assertEqualType<string[], t2>(true);
-
 
 test("passing validations", () => {
   expect(minTwo.schema).toMatchObject({
