@@ -357,6 +357,9 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
    * Provides minimum value
    *
    * Set schema `minimum = value` (and add `exclusiveMinimum = true` if needed)
+   * @example
+   * s.number().min(2, true) // > 2
+   * s.number().min(2) // >= 2
    */
   minimum(value: number, exclusive = false) {
     if (exclusive) {
@@ -649,8 +652,9 @@ type ObjectDefinition = { [key: string]: SchemaBuilder }
 type Merge<F, S> = Omit<F, keyof S> & S
 class ObjectSchemaBuilder<
   Definition extends ObjectDefinition = ObjectDefinition,
-  T = { [K in keyof Definition]: Infer<Definition[K]> }
-> extends SchemaBuilder<T, ObjectSchema, ObjectTypes.OptionalUndefined<T>> {
+  T = { [K in keyof Definition]: Infer<Definition[K]> },
+  Out = ObjectTypes.OptionalUndefined<T>
+> extends SchemaBuilder<T, ObjectSchema, Out> {
   protected precheck(arg: unknown): arg is T {
     if (typeof arg === 'object' && arg !== null) {
       return true
@@ -808,27 +812,18 @@ class ObjectSchemaBuilder<
   /**
    * Define schema for additional properties
    *
-   * If you need to make `additionalProperties=false` => use `strict` method
+   * If you need to make `additionalProperties=false` use `strict` method instead
    *
-   * @see {@link ObjectSchemaBuilder.strict}
+   * @see {@link ObjectSchemaBuilder.strict strict}
    */
-  additionalProperties<S extends AnySchemaBuilder>(
+  rest<S extends AnySchemaBuilder>(
     def: S,
   ): ObjectSchemaBuilder<
     Definition & S,
-    { [K in keyof T]: T[K] } & { [key: string]: Infer<S> }
+    { [K in keyof T]: T[K] } & { [K in string]: Infer<S> },
+    { [K in keyof T]: T[K] } & { [K in string]: Infer<S> }
   > {
     this.schema.additionalProperties = def.schema
-    return this as never
-  }
-
-  optionalProperties<Def extends ObjectDefinition = ObjectDefinition>(def: Def): ObjectSchemaBuilder<Definition & Partial<Def>, T & { [K in keyof Def]?: Infer<Def[K]> }> {
-    if (!this.schema.optionalProperties) {
-      this.schema.optionalProperties = {}
-    }
-    Object.entries(def).forEach(([key, d]) => {
-      this.schema.optionalProperties![key] = d.schema
-    })
     return this as never
   }
 
@@ -987,6 +982,8 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
   get element() {
     return this.definition
   }
+
+  max = this.maxLength
   /**
    * Must contain less items or equal than declared
    * @see {@link ArraySchemaBuilder.length}
@@ -1056,6 +1053,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
     this.schema.minItems = value as L
     return this
   }
+  min = this.minLength
 
   /**
    * same as `s.array().minLength(1)`
@@ -1066,16 +1064,34 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
   }
 
   /**
-   * marks array for unique items
+   * Set the `uniqueItems` keyword to `true`.
+   * @example
+   * const items = s.array(s.number()).unique()
+   * 
+   * items.parse([1, 2, 3, 4, 5]) // OK
+   * items.parse([1, 2, 3, 3, 3]) // Error: items are not unique
    */
   unique() {
     this.schema.uniqueItems = true
     return this
   }
-  contains<S extends AnySchemaBuilder>(containItem: S) {
+
+  /**
+   * 
+   * @param containItem 
+   * @returns 
+   */
+  contains<S extends AnySchemaBuilder>(containItem: S): ArraySchemaBuilder<E | Infer<S>> {
     this.schema.contains = containItem.schema
     return this
   }
+  /**
+   * ## draft 2019-09
+   * `minContains` and `maxContains` can be used with contains to further specify how many times a schema matches a
+   * `contains` constraint. These keywords can be any non-negative number including zero.
+   * @example
+   * s.array(s.string()).contains(s.number()).minContains(3)
+   */
   minContains(value: number) {
     this.schema.minContains = value;
     return this

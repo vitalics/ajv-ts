@@ -369,13 +369,12 @@ test('[json schema] dependant requirements', () => {
 test('optional properties', () => {
   const Test = s.object({
     qwe: s.string(),
-  }).optionalProperties({
-    asd: s.number(),
-  })
+  }).rest(s.number())
   type T = s.infer<typeof Test>
 
   assertEqualType<T, {
-    asd?: number;
+    [x: string]: number;
+  } & {
     qwe: string;
   }>(true)
 })
