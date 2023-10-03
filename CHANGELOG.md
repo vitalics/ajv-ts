@@ -1,5 +1,11 @@
 # ajv-ts
 
+## 0.2.0
+
+### Minor Changes
+
+- 52d376d: Add integer support. Add dependantRequired support for object. Add JSDoc with examples
+
 ## 0.1.4
 
 ### Patch Changes
