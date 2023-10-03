@@ -3,7 +3,7 @@ import addFormats from 'ajv-formats'
 
 import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, } from './types/index'
 import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
-import { Create, CreateBetween } from './types/array'
+import type { IsPositiveInteger } from './types/number'
 
 export const DEFAULT_AJV = addFormats(new Ajv({}))
 /** Any schema builder. */
@@ -20,24 +20,6 @@ type AnySchemaBuilder =
   | ConstantSchemaBuilder
   | UnionSchemaBuilder
   | IntersectionSchemaBuilder
-
-type IsFloat<N extends number | string> = N extends number
-  ? IsFloat<`${N}`>
-  : N extends `${number}.${number extends 0 ? '' : number}`
-  ? true
-  : false
-
-type IsNegative<N extends number | string> = N extends number
-  ? IsNegative<`${N}`>
-  : N extends `-${number}`
-  ? true
-  : false
-
-type IsPositiveInteger<N extends number | string> = IsFloat<N> extends true
-  ? false
-  : IsNegative<N> extends true
-  ? false
-  : true
 
 type MetaObject = Pick<BaseSchema, 'title'> &
   Pick<BaseSchema, 'description'> &
@@ -1045,8 +1027,8 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
         'Type Error. Only Positive and non floating numbers are supported.',
         `Received: '${L}'`,
       ],
-  ): ArraySchemaBuilder<any, CreateBetween<L, L, E>> {
-    return this.minLength(value).maxLength(value) as never
+  ) {
+    return this.minLength(value).maxLength(value)
   }
   /**
    * Must contain more items or equal than declared
