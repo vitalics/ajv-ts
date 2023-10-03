@@ -155,7 +155,7 @@ export type NumberSchema = BaseSchema & {
    * @type {number}
    */
   exclusiveMinimum?: number | boolean
-  format?: 'int32' | 'double'
+  format?: 'int32' | 'double' | 'int64' | 'float'
 }
 
 /**
@@ -329,6 +329,7 @@ export type ObjectSchema = BaseSchema & {
    * { "I_42": "This is a string" } // error: the name starts with I_, it must be an integer
    */
   patternProperties?: Record<Pattern, AnySchemaOrAnnotation>
+  dependentRequired?: Record<string, string[]>
   /**
    * The additionalProperties keyword is used to control the handling of extra stuff, that is,
    * properties whose names are not listed in the properties keyword or match any of
@@ -350,6 +351,7 @@ export type ObjectSchema = BaseSchema & {
    * { "number": 1600,"direction": "NW" } // error. Since `additionalProperties` is false, this extra property “direction” makes the object invalid
    */
   additionalProperties?: boolean | AnySchemaOrAnnotation
+  optionalProperties?: Record<string, AnySchemaOrAnnotation>
   /**
    * By default, the properties defined by the properties keyword are not required.
    * However, one can provide a list of required properties using the required keyword.

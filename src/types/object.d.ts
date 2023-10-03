@@ -1,28 +1,3 @@
-/**
- * UnionToIntersection<{ foo: string } | { bar: string }> =
- *  { foo: string } & { bar: string }.
- */
-export type UnionToIntersection<U> = (
-  U extends unknown ? (arg: U) => 0 : never
-) extends (arg: infer I) => 0
-  ? I
-  : never;
-
-/**
- * LastInUnion<1 | 2> = 2.
- */
-type LastInUnion<U> = UnionToIntersection<
-  U extends unknown ? (x: U) => 0 : never
-> extends (x: infer L) => 0
-  ? L
-  : never;
-
-/**
- * UnionToTuple<1 | 2> = [1, 2].
- */
-export type UnionToTuple<U, Last = LastInUnion<U>> = [U] extends [never]
-  ? []
-  : [...UnionToTuple<Exclude<U, Last>>, Last];
 
 /**
  * @example
@@ -44,15 +19,13 @@ export type RequiredByKeys<T, K = keyof T> = {
   ? { [P in keyof I]: I[P] }
   : never
 
-export type AssertEqual<T, U> = (<V>() => V extends T ? 1 : 2) extends <
-  V
->() => V extends U ? 1 : 2
-  ? true
-  : false;
-
 type Merge<T> = {
   [K in keyof T]: T[K]
 }
+
+export type OptionalByKey<T, K extends keyof T> = Omit<T, K> & { [Key in K]?: T[Key] }
+
+export type InferKeys<T> = T extends Record<infer K, any> ? K : never;
 
 export type OptionalUndefined<
   T,

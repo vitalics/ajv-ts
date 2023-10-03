@@ -1,10 +1,11 @@
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
 
-import type { UnionToTuple, UnionToIntersection, RequiredByKeys, OptionalUndefined, IndexType } from './type-utils'
-import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './types'
+import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, } from './types/index'
+import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
+import type { IsPositiveInteger } from './types/number'
 
-export const DEFAULT_AJV = addFormats(new Ajv())
+export const DEFAULT_AJV = addFormats(new Ajv({}))
 /** Any schema builder. */
 type AnySchemaBuilder =
   | NumberSchemaBuilder
@@ -19,24 +20,6 @@ type AnySchemaBuilder =
   | ConstantSchemaBuilder
   | UnionSchemaBuilder
   | IntersectionSchemaBuilder
-
-type IsFloat<N extends number | string> = N extends number
-  ? IsFloat<`${N}`>
-  : N extends `${number}.${number extends 0 ? '' : number}`
-  ? true
-  : false
-
-type IsNegative<N extends number | string> = N extends number
-  ? IsNegative<`${N}`>
-  : N extends `-${number}`
-  ? true
-  : false
-
-type IsPositiveInteger<N extends number | string> = IsFloat<N> extends true
-  ? false
-  : IsNegative<N> extends true
-  ? false
-  : true
 
 type MetaObject = Pick<BaseSchema, 'title'> &
   Pick<BaseSchema, 'description'> &
@@ -284,33 +267,97 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   constructor() {
     super({ type: 'number' })
   }
-
-  int() {
-    this.schema.type = 'integer'
-    return this
+  private setType(type: string): () => this {
+    return () => {
+      this.schema.type = type as never
+      return this
+    }
   }
 
-  format(type: 'int32' | 'double') {
-    if (type !== 'double' && type !== 'int32') {
-      throw new TypeError(
-        `format supports only "int32" and "double" values. Received: "${type}"`,
-      )
-    }
+
+  /**
+   * signed byte value (-128 .. 127)
+   * 
+   * Set schema `{type: 'int8'}`
+   */
+  int8 = this.setType('int8')
+  /**
+   * unsigned byte value (0 .. 255)
+   * 
+   * Set schema `{type: 'uint8'}`
+   */
+  uint8 = this.setType('uint8')
+  /**
+   * signed word value (-32768 .. 32767),
+   * 
+   * Set schema `{type: 'int16'}`
+   */
+  int16 = this.setType('int16')
+  /**
+   * unsigned word value (0 .. 65535)
+   *
+   * Set schema `{type: 'uint16'}`
+   */
+  uint16 = this.setType('uint16')
+  /** 
+   * signed 32-bit integer value
+   * 
+   * Set schema `{type: 'int32'}`
+   * 
+   */
+  int32 = this.setType('int32')
+  /**
+   * unsigned 32-bit integer value
+   * 
+   * Set schema `{type: 'uint32'}`
+   */
+  uint32 = this.setType('uint32')
+  /**
+   * 32-bit real number
+   * 
+   * Set schema `{type: 'float32'}`
+   */
+  float32 = this.setType('float32')
+  /**
+   * 64-bit real number
+   * 
+   * Set schema `{type: 'float64'}`
+   */
+  float64 = this.setType('float64')
+  /**
+   * change schema type from `any integer number` to `any number`.
+   * 
+   * Set schema `{type: 'number'}`
+   * 
+   * This is default behavior
+   */
+  number = this.setType('number')
+
+  /** Set schema `{type: 'integer'}` */
+  integer = this.setType('integer')
+
+  /**
+   * Appends format for your number schema.
+   */
+  format(type: NumberSchema['format']) {
     this.schema.format = type
     return this
   }
 
   get minValue() {
-    // TODO: handle exclusiveMinimum as boolean
     return this.schema.minimum || this.schema.exclusiveMinimum as number || null
   }
 
   get maxValue() {
-    // TODO: handle exclusiveMaximum as boolean
     return this.schema.maximum || this.schema.exclusiveMaximum as number || null
   }
 
   min = this.minimum
+  /** 
+   * Provides minimum value
+   *
+   * Set schema `minimum = value` (and add `exclusiveMinimum = true` if needed)
+   */
   minimum(value: number, exclusive = false) {
     if (exclusive) {
       this.schema.exclusiveMinimum = value
@@ -320,17 +367,23 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
     return this
   }
 
-  step(value: number) {
-    return this.multipleOf(value)
-  }
+  step = this.multipleOf
 
   /**
    * Numbers can be restricted to a multiple of a given number, using the `multipleOf` keyword.
    * It may be set to any positive number. Same as `step`.
    *
    * **NOTE**: Since JSON schema odes not allow to use `multipleOf` with negative value - we use `Math.abs` to transform negative values into positive
+   * @see {@link NumberSchemaBuilder.step step}
+   * @example
+   * const a = s.number().multipleOf(10)
    * 
-   * @see {@link NumberSchemaBuilder.step}
+   * a.parse(10) // ok
+   * a.parse(9) // error
+   * 
+   * const b = s.number().multipleOf(-0.1)
+   * b.parse(1.1) // ok, step is `0.1`
+   * b.parse(1) // error, step is not `0.1`
    */
   multipleOf(value: number) {
     this.schema.multipleOf = Math.abs(value)
@@ -341,7 +394,7 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   /**
    * marks you number maximum value
    */
-  maximum(value: number, exclusive: boolean = false) {
+  maximum(value: number, exclusive = false) {
     if (exclusive) {
       this.schema.exclusiveMaximum = value
     } else {
@@ -361,16 +414,19 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   /**
    * Greater than or equal
    *
-   * @see {@link NumberSchemaBuilder.maximum}
-   * @see {@link NumberSchemaBuilder.gt}
+   * Range: `[value; Infinity)`
+   * @see {@link NumberSchemaBuilder.maximum maximum}
+   * @see {@link NumberSchemaBuilder.gt gt}
    */
   gte(value: number) {
     return this.minimum(value)
   }
   /**
    * Less than
-   * @see {@link NumberSchemaBuilder.minimum}
-   * @see {@link NumberSchemaBuilder.lte}
+   * 
+   * Range: `(value; Infinity]`
+   * @see {@link NumberSchemaBuilder.minimum minimum}
+   * @see {@link NumberSchemaBuilder.lte lte}
    */
   lt(value: number) {
     return this.max(value, true)
@@ -378,21 +434,37 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   /**
    * Less than or Equal
    *
+   * Range: `[value; Infinity)`
    * @see {@link NumberSchemaBuilder.minimum}
    * @see {@link NumberSchemaBuilder.lt}
    */
   lte(value: number) {
     return this.max(value)
   }
+  /** Any positive number (greater than `0`)
+   * Range: `(0; Infinity]`
+   */
   positive() {
     return this.gt(0)
   }
+  /** Any non negative number (greater than or equal `0`)
+   *
+   * Range: `[0; Inifnity]`
+   */
   nonnegative() {
     return this.gte(0)
   }
+  /** Any negative number (less than `0`)
+  *
+  * Range: `[Inifinity; 0)`
+  */
   negative() {
     return this.lt(0)
   }
+  /** Any non postive number (less than or equal `0`)
+  *
+  * Range: `(Inifinity; 0]`
+  */
   nonpositive() {
     return this.lte(0)
   }
@@ -402,12 +474,33 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   }
 }
 /**
- * Construct `number` schema
+ * Construct `number` schema.
+ * 
+ * **NOTE:** By default Ajv fails `{"type": "number"}` (or `"integer"`) 
+ * validation for `Infinity` and `NaN`.
+ * 
+ * @example
+ * const test1 = s.number()
+ * 
+ * test1.parse(1) // ok
+ * test1.parse('qwe') // error
  */
 function number() {
   return new NumberSchemaBuilder()
 }
-class StringSchemaBuilder extends SchemaBuilder<string, StringSchema, string> {
+
+/**
+ * construct `integer` schema.
+ * 
+ * Same as `s.number().integer()`
+ * 
+ * **NOTE:** By default Ajv fails `{"type": "integer"}` validation for `Infinity` and `NaN`.
+ */
+function integer() {
+  return new NumberSchemaBuilder().integer()
+}
+
+class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
   protected precheck(arg: unknown): arg is string {
     if (
       !!this.isNullable &&
@@ -495,7 +588,14 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema, string> {
     return this.minLength(1)
   }
 
-  format(formatType: StringSchema['format']) {
+  email() {
+    return this.format('email')
+  }
+  ipv4() {
+    return this.format('ipv4')
+  }
+
+  format(formatType: StringSchema['format']): Omit<this, 'format'> {
     this.schema.format = formatType
     return this
   }
@@ -550,7 +650,7 @@ type Merge<F, S> = Omit<F, keyof S> & S
 class ObjectSchemaBuilder<
   Definition extends ObjectDefinition = ObjectDefinition,
   T = { [K in keyof Definition]: Infer<Definition[K]> }
-> extends SchemaBuilder<T, ObjectSchema, OptionalUndefined<T>> {
+> extends SchemaBuilder<T, ObjectSchema, ObjectTypes.OptionalUndefined<T>> {
   protected precheck(arg: unknown): arg is T {
     if (typeof arg === 'object' && arg !== null) {
       return true
@@ -577,7 +677,7 @@ class ObjectSchemaBuilder<
    * Opposite of `strict`
    * @see {@link ObjectSchemaBuilder.strict strict}
    */
-  passthrough(): ObjectSchemaBuilder<IndexType<Definition>, IndexType<T>> {
+  passthrough(): ObjectSchemaBuilder<Definition, ObjectTypes.IndexType<T>> {
     this.schema.additionalProperties = true
     return this as never
   }
@@ -586,6 +686,83 @@ class ObjectSchemaBuilder<
    */
   partial(): ObjectSchemaBuilder<Definition, Partial<T>> {
     this.schema.required = []
+    return this as never
+  }
+
+  /**
+   * Makes selected properties partial(not required), rest of them are not changed.
+   * 
+   * Same as for as for `requiredFor('item1').requiredFor('item2')...etc`
+   * 
+   * @example
+   * const Test = s.object({
+   *  name: s.string(),
+   *  email: s.string(),
+   * })
+   * .required()
+   * .partialFor('email')
+   * 
+   * Test.schema === {
+   *  type: 'object',
+   *  properties: {
+   *    "name": {type: 'string'},
+   *    "email": {type: 'string'}
+   *  }
+   *  "required": ['name']
+   * }
+   */
+  partialFor<Key extends keyof T = keyof T>(
+    key: Key,
+  ): ObjectSchemaBuilder<Definition, ObjectTypes.OptionalByKey<T, Key>> {
+    const required = this.schema.required as string[]
+    const findedIndex = required.indexOf(key as string)
+    // remove element from array. e.g. "email" for ['name', 'email'] => ['name']
+    // opposite of push
+    if (findedIndex !== -1) {
+      (this.schema.required as string[]).splice(findedIndex, 1)
+    }
+    return this as never
+  }
+
+  /**
+   * The `dependentRequired` keyword conditionally requires that
+   * certain properties must be present if a given property is
+   * present in an object. For example, suppose we have a schema
+   * representing a customer. If you have their credit card number,
+   * you also want to ensure you have a billing address.
+   * If you don't have their credit card number, a billing address
+   * would not be required. We represent this dependency of one property
+   * on another using the `dependentRequired` keyword.
+   * The value of the `dependentRequired` keyword is an object.
+   * Each entry in the object maps from the name of a property, p,
+   * to an array of strings listing properties that are required
+   * if p is present.
+   *
+   * In the following example,whenever a `credit_card` property is provided,
+   * a `billing_address` property must also be present:
+   * @example
+   * const Test1 = s.object({
+   * name: s.string(),
+   * credit_card: s.number(),
+   * billing_address: s.string(),
+   * }).requiredFor('name').dependentRequired({
+   *   credit_card: ['billing_address'],
+   * })
+   * Test1.schema === {
+   *   "type": "object",
+   *   "properties": {
+   *     "name": { "type": "string" },
+   *     "credit_card": { "type": "number" },
+   *     "billing_address": { "type": "string" }
+   *   },
+   *   "required": ["name"],
+   *   "dependentRequired": {
+   *     "credit_card": ["billing_address"]
+   *   }
+   * }
+   */
+  dependentRequired<Deps = { [K in keyof T]?: Exclude<keyof T, K>[] }>(dependencies: Deps): ObjectSchemaBuilder<Definition, ObjectTypes.OptionalByKey<T, ObjectTypes.InferKeys<Deps> extends keyof T ? ObjectTypes.InferKeys<Deps> : keyof T>> {
+    this.schema.dependentRequired = dependencies as never
     return this as never
   }
 
@@ -607,7 +784,7 @@ class ObjectSchemaBuilder<
    */
   requiredFor<Key extends keyof T = keyof T>(
     key: Key,
-  ): ObjectSchemaBuilder<Definition, RequiredByKeys<T, Key>> {
+  ): ObjectSchemaBuilder<Definition, ObjectTypes.RequiredByKeys<T, Key>> {
     this.schema.required = [
       ...new Set([...this.schema.required!, key as string]),
     ]
@@ -642,6 +819,16 @@ class ObjectSchemaBuilder<
     { [K in keyof T]: T[K] } & { [key: string]: Infer<S> }
   > {
     this.schema.additionalProperties = def.schema
+    return this as never
+  }
+
+  optionalProperties<Def extends ObjectDefinition = ObjectDefinition>(def: Def): ObjectSchemaBuilder<Definition & Partial<Def>, T & { [K in keyof Def]?: Infer<Def[K]> }> {
+    if (!this.schema.optionalProperties) {
+      this.schema.optionalProperties = {}
+    }
+    Object.entries(def).forEach(([key, d]) => {
+      this.schema.optionalProperties![key] = d.schema
+    })
     return this as never
   }
 
@@ -794,7 +981,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
   }
 
   constructor(private definition: SchemaBuilder) {
-    super({ type: 'array', items: [definition.schema] })
+    super({ type: 'array', items: [definition.schema], minItems: 0 })
   }
 
   get element() {
@@ -841,9 +1028,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
         `Received: '${L}'`,
       ],
   ) {
-    this.schema.maxItems = value as L
-    this.schema.minItems = value as L
-    return this
+    return this.minLength(value).maxLength(value)
   }
   /**
    * Must contain more items or equal than declared
@@ -877,8 +1062,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
    * @see {@link ArraySchemaBuilder.minLength}
    */
   nonEmpty(): ArraySchemaBuilder<E, [E, ...E[]]> {
-    this.schema.minItems = 1
-    return this as never
+    return this.minLength(1) as never
   }
 
   /**
@@ -886,6 +1070,18 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
    */
   unique() {
     this.schema.uniqueItems = true
+    return this
+  }
+  contains<S extends AnySchemaBuilder>(containItem: S) {
+    this.schema.contains = containItem.schema
+    return this
+  }
+  minContains(value: number) {
+    this.schema.minContains = value;
+    return this
+  }
+  maxContains(value: number) {
+    this.schema.maxContains = value;
     return this
   }
 }
@@ -921,7 +1117,7 @@ class TupleSchemaBuilder<
     return false
   }
   constructor(...defs: Schemas) {
-    super({ type: 'array', prefixItems: defs.map(def => def.schema), items: false })
+    super({ type: 'array', items: defs.map(def => def.schema), additionalItems: false, minItems: 1 })
   }
   rest<Def extends SchemaBuilder>(def: Def): SchemaBuilder<OutputTypeOfTupleWithRest<Schemas>, ArraySchema, [...OutputTypeOfTupleWithRest<Schemas>, ...Infer<Def>[]]> {
     this.schema.items = def.schema
@@ -1078,21 +1274,12 @@ function and<S extends SchemaBuilder[] = SchemaBuilder[]>(
   return new IntersectionSchemaBuilder<S>(...schemaDefs)
 }
 
-class UnknownsSchemaBuilder<T extends unknown | any = unknown> extends SchemaBuilder<T, AnySchemaOrAnnotation>{
+class UnknownsSchemaBuilder<T extends unknown | any> extends SchemaBuilder<T, AnySchemaOrAnnotation>{
   protected precheck(arg: unknown): arg is T {
     return true
   }
   constructor() {
-    super({
-      anyOf: [
-        { type: 'array' },
-        { type: 'boolean' },
-        { type: 'integer' },
-        { type: 'null' },
-        { type: 'object' },
-        { type: 'string' },
-      ]
-    } as AnySchemaOrAnnotation)
+    super({} as AnySchemaOrAnnotation)
   }
 }
 
@@ -1107,7 +1294,7 @@ function any() {
  * Same as {@link any} but for typescript better type quality
  */
 function unknown() {
-  return new UnknownsSchemaBuilder()
+  return new UnknownsSchemaBuilder<unknown>()
 }
 
 function injectAjv<S extends SchemaBuilder = SchemaBuilder>(ajv: Ajv, schemaBuilderFn: (...args: any[]) => S): (...args: unknown[]) => S {
@@ -1126,6 +1313,8 @@ function injectAjv<S extends SchemaBuilder = SchemaBuilder>(ajv: Ajv, schemaBuil
 function create(ajv: Ajv) {
   return {
     number: injectAjv(ajv, number) as typeof number,
+    integer: injectAjv(ajv, integer) as typeof integer,
+    int: injectAjv(ajv, integer) as typeof integer,
     string: injectAjv(ajv, string) as typeof string,
     null: injectAjv(ajv, nil) as typeof nil,
     enum: injectAjv(ajv, makeEnum) as typeof makeEnum,
@@ -1148,6 +1337,8 @@ export {
   create,
   create as new,
   number,
+  integer as int,
+  integer,
   string,
   boolean,
   nil as null,

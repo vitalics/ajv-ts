@@ -308,3 +308,74 @@ test("passthrough index signature", () => {
   type b = s.infer<typeof b>;
   assertEqualType<{ [k: string]: unknown }, b>(true);
 });
+
+test('[json schema] dependant requirements', () => {
+  const Test1 = s.object({
+    name: s.string(),
+    credit_card: s.number(),
+    billing_address: s.string(),
+  }).requiredFor('name').dependentRequired({
+    credit_card: ['billing_address'],
+  })
+
+  expect(Test1.schema).toMatchObject(
+    {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "credit_card": { "type": "number" },
+        "billing_address": { "type": "string" }
+      },
+      "required": ["name"],
+      "dependentRequired": {
+        "credit_card": ["billing_address"]
+      }
+    }
+  );
+
+  type Result = s.infer<typeof Test1>
+  assertEqualType<Result, {
+    credit_card?: number | undefined;
+    name: string;
+    billing_address: string;
+  }>(true)
+
+  const Test2 = s.object({
+    name: s.string(),
+    credit_card: s.number(),
+    billing_address: s.string(),
+  }).requiredFor('name').dependentRequired({
+    credit_card: ["billing_address"],
+    billing_address: ["credit_card"]
+  })
+
+  expect(Test2.schema).toMatchObject(
+    {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "credit_card": { "type": "number" },
+        "billing_address": { "type": "string" }
+      },
+      "required": ["name"],
+      "dependentRequired": {
+        "credit_card": ["billing_address"],
+        "billing_address": ["credit_card"]
+      }
+    }
+  )
+})
+
+test('optional properties', () => {
+  const Test = s.object({
+    qwe: s.string(),
+  }).optionalProperties({
+    asd: s.number(),
+  })
+  type T = s.infer<typeof Test>
+
+  assertEqualType<T, {
+    asd?: number;
+    qwe: string;
+  }>(true)
+})

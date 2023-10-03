@@ -1,6 +1,6 @@
-import * as s from './base'
-export * from './base'
-export * as SchemaType from './types'
+import * as s from './builder'
+export * from './builder'
+export * as SchemaType from './schema/types'
 
-export * as s from './base'
+export * as s from './builder'
 export default s
