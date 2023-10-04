@@ -553,6 +553,14 @@ Test.schema === {
 
 ```typescript
 const stringArray = s.array(s.string());
+type StringArray = s.infer<typeof stringArray> // string[]
+```
+
+Or it's invariant
+
+```ts
+const stringArray = s.string().array();
+type StringArray = s.infer<typeof stringArray> // string[]
 ```
 
 ### `.element`
@@ -560,7 +568,7 @@ const stringArray = s.array(s.string());
 Use `.element` to access the schema for an element of the array.
 
 ```ts
-stringArray.element; // => string schema
+stringArray.element; // => string schema, not array schema
 ```
 
 ### `.nonempty`
@@ -576,7 +584,7 @@ nonEmptyStrings.parse([]); // throws: "Array cannot be empty"
 nonEmptyStrings.parse(["Ariana Grande"]); // passes
 ```
 
-### `.min`/`.max`/`.length`
+### `.min`/`.max`/`.length`/`.minLength`/`.maxLength`
 
 ```ts
 s.string().array().min(5); // must contain 5 or more items
@@ -596,6 +604,8 @@ const UniqueNumbers = s.array(s.number()).unique()
 UniqueNumbers.parse([1,2,3,4]) // Ok
 UniqueNumbers.parse([1,2,3,3]) // Error
 ```
+
+### `.contains`/`.minContains`
 
 ## Tuples
 
@@ -622,9 +632,11 @@ const result = variadicTuple.parse(["hello", 1, 2, 3]);
 // => [string, ...number[]];
 ```
 
-## Unions
+## unions/or
 
 includes a built-in s.union method for composing "OR" types.
+
+This function accepts array of schemas by spread argument or array.
 
 ```ts
 const stringOrNumber = s.union([s.string(), s.number()]);
@@ -633,7 +645,19 @@ stringOrNumber.parse("foo"); // passes
 stringOrNumber.parse(14); // passes
 ```
 
-## Intersections
+Or it's invariant:
+
+```ts
+s.union(s.string(), s.number()) // string | number
+```
+
+Or it's invariant - `or` function:
+
+```ts
+s.number().or(s.string()) // number | string
+```
+
+## Intersections/and
 
 Intersections are useful for creating "logical AND" types. This is useful for intersecting two object types.
 
@@ -648,11 +672,17 @@ const Employee = s.object({
 
 const EmployedPerson = s.intersection(Person, Employee);
 
+// same as
+const EmployedPerson = s.intersection([Person, Employee]);
+
 // equivalent to:
 const EmployedPerson = Person.and(Employee);
+
+// equivalent to:
+const EmployedPerson = and(Person, Employee);
 ```
 
-Though in many cases, it is recommended to use `A.merge(B)` to merge two objects. The `.merge` method returns a new Object instance, whereas `A.and(B)` returns a less useful Intersection instance that lacks common object methods like pick and omit.
+Though in many cases, it is recommended to use `A.merge(B)` to merge two objects. The `.merge` method returns a new Object instance, whereas `A.and(B)` returns a less useful Intersection instance that lacks common object methods like `pick` and `omit`.
 
 ```ts
 const a = s.union([s.number(), s.string()]);

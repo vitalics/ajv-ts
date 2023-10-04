@@ -7,6 +7,8 @@ import { type SchemaObject } from 'ajv'
 export type BaseSchema = SchemaObject & {
   anyOf?: AnySchemaOrAnnotation[]
   oneOf?: AnySchemaOrAnnotation[]
+  allOf?: AnySchemaOrAnnotation[]
+  not?: AnySchemaOrAnnotation
   type?: string
   $ref?: string
   /**

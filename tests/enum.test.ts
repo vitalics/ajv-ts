@@ -3,7 +3,6 @@ import { test, expect } from 'bun:test'
 import s from '../src'
 import { assertEqualType, assertIs } from '../src/utils';
 
-
 test("create enum", () => {
   const MyEnum = s.enum(["Red", "Green", "Blue"]);
   expect(MyEnum.enum.Red).toEqual("Red");

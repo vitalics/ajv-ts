@@ -9,7 +9,7 @@ const Test = s.object({
   f3: s.string().nullable(),
   f4: s.array(
     s.object({
-      t: s.union([s.string(), s.boolean()])
+      t: s.union(s.string(), s.boolean())
     })
   )
 });
@@ -114,24 +114,24 @@ test("test that optional keys are unset", async () => {
 });
 
 test("test nonexistent keys", async () => {
-  const Schema = s.union([
+  const Schema = s.union(
     s.object({ a: s.string() }),
     s.object({ b: s.number() }),
-  ]);
+  );
   const obj = { a: "A" };
   const result = Schema.safeParse(obj); // Works with 1.11.10, breaks with 2.0.0-beta.21
   expect(result.success).toBe(true);
 });
 
 test("test async union", async () => {
-  const Schema2 = s.union([
+  const Schema2 = s.union(
     s.object({
       ty: s.string(),
     }),
     s.object({
       ty: s.number(),
     }),
-  ]);
+  );
 
   const obj = { ty: "A" };
   const result = Schema2.safeParse(obj); // Works with 1.11.10, breaks with 2.0.0-beta.21
@@ -156,10 +156,10 @@ test("inferred merged object type with optional properties", async () => {
 });
 
 test("inferred unioned object type with optional properties", async () => {
-  const Unioned = s.union([
+  const Unioned = s.union(
     s.object({ a: s.string(), b: s.string().optional() }),
     s.object({ a: s.string().optional(), b: s.string() }),
-  ]);
+  );
   type Unioned = s.infer<typeof Unioned>;
   assertEqualType<
     Unioned,

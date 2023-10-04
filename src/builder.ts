@@ -167,6 +167,27 @@ abstract class SchemaBuilder<
     return this;
   }
 
+  /** Construct Array schema. Same as `s.array(s.number())` */
+  array() {
+    return array(this)
+  }
+
+  intersection = this.and
+
+  and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(defs: S): IntersectionSchemaBuilder<[this, ...S]>
+  and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...defs: S): IntersectionSchemaBuilder<[this, ...S]>
+  and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...others: S): IntersectionSchemaBuilder<[this, ...S]> {
+    return and(this, ...others)
+  }
+
+  or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(defs: S): UnionSchemaBuilder<[this, ...S]>
+  or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...defs: S): UnionSchemaBuilder<[this, ...S]>
+  or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...others: S): UnionSchemaBuilder<[this, ...S]> {
+    return or(this, ...others)
+  }
+
+  union = this.or
+
   /**
    * Parse you input result. Used `ajv.validate` under the hood
    * 
@@ -345,11 +366,11 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   }
 
   get minValue() {
-    return this.schema.minimum || this.schema.exclusiveMinimum as number || null
+    return this.schema.minimum ?? this.schema.exclusiveMinimum as number
   }
 
   get maxValue() {
-    return this.schema.maximum || this.schema.exclusiveMaximum as number || null
+    return this.schema.maximum ?? this.schema.exclusiveMaximum as number
   }
 
   min = this.minimum
@@ -427,7 +448,7 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   /**
    * Less than
    * 
-   * Range: `(value; Infinity]`
+   * Range: `(value; Infinity)`
    * @see {@link NumberSchemaBuilder.minimum minimum}
    * @see {@link NumberSchemaBuilder.lte lte}
    */
@@ -445,21 +466,21 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
     return this.max(value)
   }
   /** Any positive number (greater than `0`)
-   * Range: `(0; Infinity]`
+   * Range: `(0; Infinity)`
    */
   positive() {
     return this.gt(0)
   }
   /** Any non negative number (greater than or equal `0`)
    *
-   * Range: `[0; Inifnity]`
+   * Range: `[0; Inifnity)`
    */
   nonnegative() {
     return this.gte(0)
   }
   /** Any negative number (less than `0`)
   *
-  * Range: `[Inifinity; 0)`
+  * Range: `(Inifinity; 0)`
   */
   negative() {
     return this.lt(0)
@@ -688,7 +709,7 @@ class ObjectSchemaBuilder<
   /**
    * Makes all properties partial(not required)
    */
-  partial(): ObjectSchemaBuilder<Definition, Partial<T>> {
+  partial(): ObjectSchemaBuilder<Definition, Partial<T>, ObjectTypes.OptionalUndefined<Partial<T>>> {
     this.schema.required = []
     return this as never
   }
@@ -787,10 +808,10 @@ class ObjectSchemaBuilder<
    * If some properties is already marked with `requiredFor` - we append new key into `required` JSON schema
    */
   requiredFor<Key extends keyof T = keyof T>(
-    key: Key,
-  ): ObjectSchemaBuilder<Definition, ObjectTypes.RequiredByKeys<T, Key>> {
+    ...keys: Key[]
+  ): ObjectSchemaBuilder<Definition, ObjectTypes.RequiredByKeys<T, (typeof keys)[number]>> {
     this.schema.required = [
-      ...new Set([...this.schema.required!, key as string]),
+      ...new Set([...this.schema.required!, ...keys as string[]]),
     ]
     return this as never
   }
@@ -820,8 +841,8 @@ class ObjectSchemaBuilder<
     def: S,
   ): ObjectSchemaBuilder<
     Definition & S,
-    { [K in keyof T]: T[K] } & { [K in string]: Infer<S> },
-    { [K in keyof T]: T[K] } & { [K in string]: Infer<S> }
+    T & { [K in string]: Infer<S> },
+    T & { [K in string]: Infer<S> }
   > {
     this.schema.additionalProperties = def.schema
     return this as never
@@ -892,13 +913,13 @@ class ObjectSchemaBuilder<
    * all object schemas have `.pick` and `.omit` methods that return a modified version.
    * Consider this Recipe schema:
    * @example
-   * const Recipe = z.object({
-   * id: z.string(),
-   * name: z.string(),
-   * ingredients: z.array(z.string()),
+   * const Recipe = s.object({
+   * id: s.string(),
+   * name: s.string(),
+   * ingredients: s.array(s.string()),
    * });
-   * const JustTheName = Recipe.omit({ name: true });
-   * type JustTheName = z.infer<typeof JustTheName>;
+   * const JustTheName = Recipe.omit('name');
+   * type JustTheName = s.infer<typeof JustTheName>;
    * // => { id: string; ingredients: string[] }
    */
   omit<K extends keyof T, Keys extends K[] = K[]>(...keys: Keys): ObjectSchemaBuilder<Definition, Omit<T, Keys[number]>> {
@@ -979,6 +1000,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
     super({ type: 'array', items: [definition.schema], minItems: 0 })
   }
 
+  /** Returns element schema */
   get element() {
     return this.definition
   }
@@ -986,8 +1008,8 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
   max = this.maxLength
   /**
    * Must contain less items or equal than declared
-   * @see {@link ArraySchemaBuilder.length}
-   * @see {@link ArraySchemaBuilder.minLength}
+   * @see {@link ArraySchemaBuilder.length length}
+   * @see {@link ArraySchemaBuilder.minLength minLength}
    * @example
    * const arr = s.array(s.number()).maxLength(3)
    * arr.parse([1, 2, 3]) // OK
@@ -1007,7 +1029,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
     return this
   }
   /**
-   * Must contain array length exactly. Same as `minLength(v)` and `maxLength(v)`
+   * Must contain array length exactly. Same as `minLength(v).maxLength(v)`
    * @see {@link ArraySchemaBuilder.maxLength}
    * @see {@link ArraySchemaBuilder.minLength}
    * @example
@@ -1090,12 +1112,23 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
    * `minContains` and `maxContains` can be used with contains to further specify how many times a schema matches a
    * `contains` constraint. These keywords can be any non-negative number including zero.
    * @example
-   * s.array(s.string()).contains(s.number()).minContains(3)
+   * const schema = s.array(s.string()).contains(s.number()).minContains(3)
+   * schema.parse(['qwe', 1,2,3]) // OK
+   * schema.parse(['qwe', 1,2]) // Error, expect at least 3 numerics
    */
   minContains(value: number) {
     this.schema.minContains = value;
     return this
   }
+  /**
+   * ## draft 2019-09
+   * `minContains` and `maxContains` can be used with contains to further specify how many times a schema matches a
+   * `contains` constraint. These keywords can be any non-negative number including zero.
+   * @example
+   * const schema = s.array(s.string()).contains(s.number()).maxContains(3)
+   * schema.parse(['qwe', 1,2,3]) // OK
+   * schema.parse(['qwe', 1,2,3, 4]) // Error, expect max 3 numbers
+   */
   maxContains(value: number) {
     this.schema.maxContains = value;
     return this
@@ -1259,31 +1292,37 @@ class UnionSchemaBuilder<
     } as AnySchemaOrAnnotation)
   }
 }
+
+function or<S extends SchemaBuilder[] = SchemaBuilder[]>(schemaDefs: S): UnionSchemaBuilder<S>
+function or<S extends SchemaBuilder[] = SchemaBuilder[]>(...schemaDefs: S): UnionSchemaBuilder<S>
 function or<S extends SchemaBuilder[] = SchemaBuilder[]>(
-  schemaDefs: S
-): SchemaBuilder<Infer<S[number]>, AnySchemaOrAnnotation> {
+  ...schemaDefs: S
+) {
   return new UnionSchemaBuilder<S>(...schemaDefs)
 }
 
 class IntersectionSchemaBuilder<
   S extends SchemaBuilder[] = SchemaBuilder[],
+  Elem = S[number],
+  Intersection extends SchemaBuilder = UnionToIntersection<Elem> extends SchemaBuilder ? UnionToIntersection<Elem> : SchemaBuilder
 > extends SchemaBuilder<
-  Infer<S[number]>,
-  AnySchemaOrAnnotation,
-  UnionToIntersection<Infer<S[number]>>
+  Infer<Intersection>,
+  AnySchemaOrAnnotation
 > {
-  protected precheck(arg: unknown): arg is Infer<S[number]> {
+  protected precheck(arg: unknown): arg is any {
     // TODO improve based on schema
     return true
   }
 
   constructor(...schemas: S) {
     super({
-      oneOf: schemas.map((s) => s.schema),
+      allOf: schemas.map((s) => s.schema),
     } as AnySchemaOrAnnotation)
   }
 }
 
+function and<S extends SchemaBuilder[] = SchemaBuilder[]>(defs: S): IntersectionSchemaBuilder<S>;
+function and<S extends SchemaBuilder[] = SchemaBuilder[]>(...defs: S): IntersectionSchemaBuilder<S>;
 function and<S extends SchemaBuilder[] = SchemaBuilder[]>(
   ...schemaDefs: S
 ) {
@@ -1324,7 +1363,7 @@ function injectAjv<S extends SchemaBuilder = SchemaBuilder>(ajv: Ajv, schemaBuil
 }
 
 /**
- * Create new instance of schema with non default AJV instance
+ * Create new instance of schema definition with non default AJV instance
  */
 function create(ajv: Ajv) {
   return {
