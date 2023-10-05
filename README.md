@@ -147,7 +147,7 @@ Not supported
 
 ## Dates
 
-Not supported
+Not supported, but you can pass `parseDates` in your AJV instance.
 
 ## Enums
 
@@ -699,6 +699,39 @@ Not supported
 ## Map
 
 Not supported
+
+## `any`/`unknown`
+
+Any and unknown defines `{}` (empty object) as JSON-schema. very useful if you need to create something specific
+
+## Custom Ajv instance
+
+If you need to create a custom AJV Instance, you can use `create` or `new` function.
+
+```ts
+import addKeywords from 'ajv-keywords';
+import schemaBuilder from 'ajv-ts'
+
+const myAjvInstance = new Ajv({parseDate: true})
+
+export const s = schemaBuilder.create(myAjvInstance)
+
+// later:
+s.string().dateTime().parse(new Date()) // 2023-10-05T19:31:57.610Z
+```
+
+## `custom` shema definition
+
+If you need to append something specific to you schema, you can use `custom` method.
+
+```ts
+const condition = s.any() // schema: {}
+
+const withIf = condition.custom('if', {properties: {foo: {type: 'string'}}})
+
+withIf.schema // {if: {properties: {foo: {type: 'string'}}}}
+
+```
 
 ## Transformations
 

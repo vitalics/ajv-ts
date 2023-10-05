@@ -1,4 +1,11 @@
-
+/**
+* A TypeScript type alias called `Prettify`.
+* It takes a type as its argument and returns a new type that has the same properties as the original type, 
+* but the properties are not intersected. This means that the new type is easier to read and understand.
+*/
+export type Prettify<T> = {
+  [K in keyof T]: T[K]
+} & {}
 /**
  * @example
  * interface User {
@@ -36,11 +43,11 @@ export type OptionalUndefined<
   Props : never
   : never
 > =
-  Merge<{
+  Prettify<Merge<{
     [K in OptionsProps]?: T[K]
   } & {
       [K in Exclude<keyof T, OptionsProps>]: T[K]
-    }>
+    }>>
 
 export type IndexType<T, Index = unknown> = {
   [K in keyof T]: T[K]
