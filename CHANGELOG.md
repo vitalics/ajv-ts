@@ -1,5 +1,12 @@
 # ajv-ts
 
+## 0.3.0
+
+### Minor Changes
+
+- ca3b768: add `custom` method for base builder
+  use `Prettify` for merging objects via `passthough` method
+
 ## 0.2.2
 
 ### Patch Changes
