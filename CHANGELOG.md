@@ -1,5 +1,11 @@
 # ajv-ts
 
+## 0.2.2
+
+### Patch Changes
+
+- 920dde5: remove integers
+
 ## 0.2.1
 
 ### Patch Changes
