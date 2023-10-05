@@ -4,6 +4,8 @@ import addFormats from 'ajv-formats'
 import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, } from './types/index'
 import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
 import type { IsPositiveInteger } from './types/number'
+import { Email, UUID } from './types/string'
+import { OmitMany } from './types/object'
 
 export const DEFAULT_AJV = addFormats(new Ajv({}))
 /** Any schema builder. */
@@ -166,6 +168,44 @@ abstract class SchemaBuilder<
     (this.schema as AnySchema).default = value
     return this;
   }
+
+  /** Construct Array schema. Same as `s.array(s.number())` */
+  array() {
+    return array(this)
+  }
+
+  /**
+   * Same as `s.and()`. Combine current type with another. Logical "AND"
+   * 
+   * Typescript `A & B`
+   */
+  intersection: typeof this.and = this.and
+  /**
+   * Same as `s.and()`. Combine current type with another. Logical "AND"
+   *
+   * Typescript `A & B`
+   */
+  and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(defs: S): IntersectionSchemaBuilder<[this, ...S]>
+  and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...defs: S): IntersectionSchemaBuilder<[this, ...S]>
+  and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...others: S): IntersectionSchemaBuilder<[this, ...S]> {
+    return and(this, ...others)
+  }
+  /**
+   * Same as `s.or()`. Combine current type with another type. Logical "OR"
+   * 
+   * Typescript "A | B"
+   */
+  or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(defs: S): UnionSchemaBuilder<[this, ...S]>
+  or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...defs: S): UnionSchemaBuilder<[this, ...S]>
+  or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...others: S): UnionSchemaBuilder<[this, ...S]> {
+    return or(this, ...others)
+  }
+  /**
+   * Same as `s.or()`. Combine current type with another type. Logical "OR"
+   * 
+   * Typescript "A | B"
+   */
+  union: typeof this.or = this.or
 
   /**
    * Parse you input result. Used `ajv.validate` under the hood
@@ -345,11 +385,11 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   }
 
   get minValue() {
-    return this.schema.minimum || this.schema.exclusiveMinimum as number || null
+    return this.schema.minimum ?? this.schema.exclusiveMinimum as number
   }
 
   get maxValue() {
-    return this.schema.maximum || this.schema.exclusiveMaximum as number || null
+    return this.schema.maximum ?? this.schema.exclusiveMaximum as number
   }
 
   min = this.minimum
@@ -357,6 +397,9 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
    * Provides minimum value
    *
    * Set schema `minimum = value` (and add `exclusiveMinimum = true` if needed)
+   * @example
+   * s.number().min(2, true) // > 2
+   * s.number().min(2) // >= 2
    */
   minimum(value: number, exclusive = false) {
     if (exclusive) {
@@ -424,7 +467,7 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   /**
    * Less than
    * 
-   * Range: `(value; Infinity]`
+   * Range: `(value; Infinity)`
    * @see {@link NumberSchemaBuilder.minimum minimum}
    * @see {@link NumberSchemaBuilder.lte lte}
    */
@@ -442,21 +485,21 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
     return this.max(value)
   }
   /** Any positive number (greater than `0`)
-   * Range: `(0; Infinity]`
+   * Range: `(0; Infinity)`
    */
   positive() {
     return this.gt(0)
   }
   /** Any non negative number (greater than or equal `0`)
    *
-   * Range: `[0; Inifnity]`
+   * Range: `[0; Inifnity)`
    */
   nonnegative() {
     return this.gte(0)
   }
   /** Any negative number (less than `0`)
   *
-  * Range: `[Inifinity; 0)`
+  * Range: `(Inifinity; 0)`
   */
   negative() {
     return this.lt(0)
@@ -500,8 +543,8 @@ function integer() {
   return new NumberSchemaBuilder().integer()
 }
 
-class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
-  protected precheck(arg: unknown): arg is string {
+class StringSchemaBuilder<S extends string = string> extends SchemaBuilder<S, StringSchema> {
+  protected precheck(arg: unknown): arg is S {
     if (
       !!this.isNullable &&
       (typeof arg === 'string' || typeof arg === 'undefined' || arg === null)
@@ -514,23 +557,64 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
     return false
   }
 
+  /**
+   * The `pattern` and `patternProperties` keywords use regular expressions to express constraints.
+   * The regular expression syntax used is from JavaScript ({@link https://www.ecma-international.org/publications-and-standards/standards/ecma-262/ ECMA 262}, specifically).
+   * However, that complete syntax is not widely supported, therefore it is recommended that you stick to the subset of that syntax described below.
+   * 
+   * - A single unicode character (other than the special characters below) matches itself.
+   * - `.`: Matches any character except line break characters. (Be aware that what constitutes a line break character is somewhat dependent on your platform and language environment, but in practice this rarely matters).
+   * - `^`: Matches only at the beginning of the string.
+   * - `$`: Matches only at the end of the string.
+   * - `(...)`: Group a series of regular expressions into a single regular expression.
+   * - `|`: Matches either the regular expression preceding or following the | symbol.
+   * - `[abc]`: Matches any of the characters inside the square brackets.
+   * - `[a-z]`: Matches the range of characters.
+   * - `[^abc]`: Matches any character not listed.
+   * - `[^a-z]`: Matches any character outside of the range.
+   * - `+`: Matches one or more repetitions of the preceding regular expression.
+   * - `*`: Matches zero or more repetitions of the preceding regular expression.
+   * - `?`: Matches zero or one repetitions of the preceding regular expression.
+   * - `+?`, `*?`, `??`: The *, +, and ? qualifiers are all greedy; they match as much text as possible. Sometimes this behavior isn't desired and you want to match as few characters as possible.
+   * - `(?!x)`, `(?=x)`: Negative and positive lookahead.
+   * - `{x}`: Match exactly x occurrences of the preceding regular expression.
+   * - `{x,y}`: Match at least x and at most y occurrences of the preceding regular expression.
+   * - `{x,}`: Match x occurrences or more of the preceding regular expression.
+   * - `{x}?`, `{x,y}?`, `{x,}?`: Lazy versions of the above expressions.
+   * @example
+   * const phoneNumber = s.string().pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$")
+   * 
+   * phoneNumber.parse("555-1212") // OK
+   * phoneNumber.parse("(888)555-1212") // OK
+   * phoneNumber.parse("(888)555-1212 ext. 532") // Error
+   * phoneNumber.parse("(800)FLOWERS") // Error
+   * // typescript custom type
+   * const prefixS = s.string().pattern<`S_${string}`>("^S_$")
+   * type S = s.infer<typeof prefixS> // `S_${string}`
+   * const str1 = prefixS.parse("qwe") // Error
+   * const str2 = prefixS.parse("S_Some") // OK
+   */
   pattern<Pattern extends string = string>(
-    regex: RegExp | string,
-  ): SchemaBuilder<string, StringSchema, `${Pattern}`> {
-    if (typeof regex === 'string') {
-      this.schema.pattern = `^${regex}$`
-    } else {
-      this.schema.pattern = `^${regex.source}$`
-    }
-    return this as SchemaBuilder<string, StringSchema, `${Pattern}`>
+    pattern: string,
+  ): StringSchemaBuilder<Pattern> {
+    this.schema.pattern = pattern
+    return this as never
   }
 
   constructor() {
     super({ type: 'string' })
   }
 
+  const<V extends string>(value: V): StringSchemaBuilder<V> {
+    this.schema.const = value
+    return this as never
+  }
+
   /**
-   * Define minimum string length
+   * Define minimum string length.
+   * 
+   * Same as `min`
+   * @see {@link StringSchemaBuilder.min min}
    */
   minLength<L extends number, Valid = IsPositiveInteger<L>>(
     value: Valid extends true
@@ -544,9 +628,19 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
     this.schema.minLength = value as L
     return this
   }
+  /**
+   * Define minimum string length.
+   * 
+   * Same as `minLength`
+   * @see {@link StringSchemaBuilder.minLength minLength}
+   */
+  min = this.minLength
 
   /**
-   * Define maximum string length
+   * Define maximum string length.
+   * 
+   * Same as `max`
+   * @see {@link StringSchemaBuilder.max max}
    */
   maxLength<L extends number, Valid = IsPositiveInteger<L>>(
     value: Valid extends true
@@ -561,7 +655,18 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
     return this
   }
   /**
+   * Define maximum string length.
+   * 
+   * Same as `maxLength`
+   * @see {@link StringSchemaBuilder.maxLength maxLength}
+   */
+  max = this.maxLength
+
+  /**
    * Define exact string length
+   * 
+   * Same as `s.string().min(v).max(v)`
+   * 
    * @see {@link StringSchemaBuilder.minLength minLength}
    * @see {@link StringSchemaBuilder.maxLength maxLength}
    * @example
@@ -588,16 +693,74 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
     return this.minLength(1)
   }
 
-  email() {
-    return this.format('email')
+  /**
+   * A string is valid against this format if it represents a valid e-mail address format.
+   * 
+   * Example: `some@gmail.com`
+   */
+  email(): OmitMany<StringSchemaBuilder<Email>, ['format', 'ipv4', 'ipv6', 'time', 'date', 'dateTime', 'regex', 'uuid', 'email']> {
+    return this.format('email') as never
   }
   ipv4() {
     return this.format('ipv4')
   }
+  ipv6() {
+    return this.format('ipv6')
+  }
+  /**
+   * A Universally Unique Identifier as defined by {@link https://datatracker.ietf.org/doc/html/rfc4122 RFC 4122}.
+   * 
+   * Same as `s.string().format('uuid')`
+   * 
+   * Example: `3e4666bf-d5e5-4aa7-b8ce-cefe41c7568a`
+   */
+  uuid() {
+    return this.format('uuid')
+  }
+  /**
+   * A string is valid against this format if it represents a time in the following format: `hh:mm:ss.sTZD`.
+   * 
+   * Same as `s.string().format('time')`
+   * 
+   * Example: `20:20:39+00:00`
+   */
+  time() {
+    return this.format('time')
+  }
+  /**
+   * A string is valid against this format if it represents a date in the following format: `YYYY-MM-DD`.
+   *
+   * Same as `s.string().format('date')`
+   * 
+   * Example: `2023-10-10`
+   */
+  date() {
+    return this.format('date')
+  }
 
-  format(formatType: StringSchema['format']): Omit<this, 'format'> {
+  /**
+   * A string is valid against this format if it represents a date-time in the following format: `YYYY:MM::DDThh:mm:ss.sTZD`.
+   * 
+   * Same as `s.string().format('date-time')`
+   * 
+   * Example: `2023-10-05T05:49:37.757Z`
+   */
+  dateTime() {
+    return this.format('date-time')
+  }
+
+  /**
+   * A string is valid against this format if it represents a valid regular expression.
+   * 
+   * Same as `s.string().format('regex')`
+   */
+  regex() {
+    return this.format('regex')
+  }
+
+  format(formatType: StringSchema['format']): OmitMany<StringSchemaBuilder<UUID>, ['format', 'ipv4', 'ipv6', 'time', 'date', 'dateTime', 'regex', 'uuid', 'email']> {
     this.schema.format = formatType
-    return this
+    return this as never
   }
 }
 
@@ -649,8 +812,9 @@ type ObjectDefinition = { [key: string]: SchemaBuilder }
 type Merge<F, S> = Omit<F, keyof S> & S
 class ObjectSchemaBuilder<
   Definition extends ObjectDefinition = ObjectDefinition,
-  T = { [K in keyof Definition]: Infer<Definition[K]> }
-> extends SchemaBuilder<T, ObjectSchema, ObjectTypes.OptionalUndefined<T>> {
+  T = { [K in keyof Definition]: Infer<Definition[K]> },
+  Out = ObjectTypes.OptionalUndefined<T>
+> extends SchemaBuilder<T, ObjectSchema, Out> {
   protected precheck(arg: unknown): arg is T {
     if (typeof arg === 'object' && arg !== null) {
       return true
@@ -684,7 +848,7 @@ class ObjectSchemaBuilder<
   /**
    * Makes all properties partial(not required)
    */
-  partial(): ObjectSchemaBuilder<Definition, Partial<T>> {
+  partial(): ObjectSchemaBuilder<Definition, Partial<T>, ObjectTypes.OptionalUndefined<Partial<T>>> {
     this.schema.required = []
     return this as never
   }
@@ -783,10 +947,10 @@ class ObjectSchemaBuilder<
    * If some properties is already marked with `requiredFor` - we append new key into `required` JSON schema
    */
   requiredFor<Key extends keyof T = keyof T>(
-    key: Key,
-  ): ObjectSchemaBuilder<Definition, ObjectTypes.RequiredByKeys<T, Key>> {
+    ...keys: Key[]
+  ): ObjectSchemaBuilder<Definition, ObjectTypes.RequiredByKeys<T, (typeof keys)[number]>> {
     this.schema.required = [
-      ...new Set([...this.schema.required!, key as string]),
+      ...new Set([...this.schema.required!, ...keys as string[]]),
     ]
     return this as never
   }
@@ -808,27 +972,18 @@ class ObjectSchemaBuilder<
   /**
    * Define schema for additional properties
    *
-   * If you need to make `additionalProperties=false` => use `strict` method
+   * If you need to make `additionalProperties=false` use `strict` method instead
    *
-   * @see {@link ObjectSchemaBuilder.strict}
+   * @see {@link ObjectSchemaBuilder.strict strict}
    */
-  additionalProperties<S extends AnySchemaBuilder>(
+  rest<S extends AnySchemaBuilder>(
     def: S,
   ): ObjectSchemaBuilder<
     Definition & S,
-    { [K in keyof T]: T[K] } & { [key: string]: Infer<S> }
+    T & { [K in string]: Infer<S> },
+    T & { [K in string]: Infer<S> }
   > {
     this.schema.additionalProperties = def.schema
-    return this as never
-  }
-
-  optionalProperties<Def extends ObjectDefinition = ObjectDefinition>(def: Def): ObjectSchemaBuilder<Definition & Partial<Def>, T & { [K in keyof Def]?: Infer<Def[K]> }> {
-    if (!this.schema.optionalProperties) {
-      this.schema.optionalProperties = {}
-    }
-    Object.entries(def).forEach(([key, d]) => {
-      this.schema.optionalProperties![key] = d.schema
-    })
     return this as never
   }
 
@@ -897,13 +1052,13 @@ class ObjectSchemaBuilder<
    * all object schemas have `.pick` and `.omit` methods that return a modified version.
    * Consider this Recipe schema:
    * @example
-   * const Recipe = z.object({
-   * id: z.string(),
-   * name: z.string(),
-   * ingredients: z.array(z.string()),
+   * const Recipe = s.object({
+   * id: s.string(),
+   * name: s.string(),
+   * ingredients: s.array(s.string()),
    * });
-   * const JustTheName = Recipe.omit({ name: true });
-   * type JustTheName = z.infer<typeof JustTheName>;
+   * const JustTheName = Recipe.omit('name');
+   * type JustTheName = s.infer<typeof JustTheName>;
    * // => { id: string; ingredients: string[] }
    */
   omit<K extends keyof T, Keys extends K[] = K[]>(...keys: Keys): ObjectSchemaBuilder<Definition, Omit<T, Keys[number]>> {
@@ -984,13 +1139,16 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
     super({ type: 'array', items: [definition.schema], minItems: 0 })
   }
 
+  /** Returns element schema */
   get element() {
     return this.definition
   }
+
+  max = this.maxLength
   /**
    * Must contain less items or equal than declared
-   * @see {@link ArraySchemaBuilder.length}
-   * @see {@link ArraySchemaBuilder.minLength}
+   * @see {@link ArraySchemaBuilder.length length}
+   * @see {@link ArraySchemaBuilder.minLength minLength}
    * @example
    * const arr = s.array(s.number()).maxLength(3)
    * arr.parse([1, 2, 3]) // OK
@@ -1010,7 +1168,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
     return this
   }
   /**
-   * Must contain array length exactly. Same as `minLength(v)` and `maxLength(v)`
+   * Must contain array length exactly. Same as `minLength(v).maxLength(v)`
    * @see {@link ArraySchemaBuilder.maxLength}
    * @see {@link ArraySchemaBuilder.minLength}
    * @example
@@ -1056,6 +1214,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
     this.schema.minItems = value as L
     return this
   }
+  min = this.minLength
 
   /**
    * same as `s.array().minLength(1)`
@@ -1066,20 +1225,49 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
   }
 
   /**
-   * marks array for unique items
+   * Set the `uniqueItems` keyword to `true`.
+   * @example
+   * const items = s.array(s.number()).unique()
+   * 
+   * items.parse([1, 2, 3, 4, 5]) // OK
+   * items.parse([1, 2, 3, 3, 3]) // Error: items are not unique
    */
   unique() {
     this.schema.uniqueItems = true
     return this
   }
-  contains<S extends AnySchemaBuilder>(containItem: S) {
+
+  /**
+   * 
+   * @param containItem 
+   * @returns 
+   */
+  contains<S extends AnySchemaBuilder>(containItem: S): ArraySchemaBuilder<E | Infer<S>> {
     this.schema.contains = containItem.schema
     return this
   }
+  /**
+   * ## draft 2019-09
+   * `minContains` and `maxContains` can be used with contains to further specify how many times a schema matches a
+   * `contains` constraint. These keywords can be any non-negative number including zero.
+   * @example
+   * const schema = s.array(s.string()).contains(s.number()).minContains(3)
+   * schema.parse(['qwe', 1,2,3]) // OK
+   * schema.parse(['qwe', 1,2]) // Error, expect at least 3 numerics
+   */
   minContains(value: number) {
     this.schema.minContains = value;
     return this
   }
+  /**
+   * ## draft 2019-09
+   * `minContains` and `maxContains` can be used with contains to further specify how many times a schema matches a
+   * `contains` constraint. These keywords can be any non-negative number including zero.
+   * @example
+   * const schema = s.array(s.string()).contains(s.number()).maxContains(3)
+   * schema.parse(['qwe', 1,2,3]) // OK
+   * schema.parse(['qwe', 1,2,3, 4]) // Error, expect max 3 numbers
+   */
   maxContains(value: number) {
     this.schema.maxContains = value;
     return this
@@ -1243,31 +1431,37 @@ class UnionSchemaBuilder<
     } as AnySchemaOrAnnotation)
   }
 }
+
+function or<S extends SchemaBuilder[] = SchemaBuilder[]>(schemaDefs: S): UnionSchemaBuilder<S>
+function or<S extends SchemaBuilder[] = SchemaBuilder[]>(...schemaDefs: S): UnionSchemaBuilder<S>
 function or<S extends SchemaBuilder[] = SchemaBuilder[]>(
-  schemaDefs: S
-): SchemaBuilder<Infer<S[number]>, AnySchemaOrAnnotation> {
+  ...schemaDefs: S
+) {
   return new UnionSchemaBuilder<S>(...schemaDefs)
 }
 
 class IntersectionSchemaBuilder<
   S extends SchemaBuilder[] = SchemaBuilder[],
+  Elem = S[number],
+  Intersection extends SchemaBuilder = UnionToIntersection<Elem> extends SchemaBuilder ? UnionToIntersection<Elem> : SchemaBuilder
 > extends SchemaBuilder<
-  Infer<S[number]>,
-  AnySchemaOrAnnotation,
-  UnionToIntersection<Infer<S[number]>>
+  Infer<Intersection>,
+  AnySchemaOrAnnotation
 > {
-  protected precheck(arg: unknown): arg is Infer<S[number]> {
+  protected precheck(arg: unknown): arg is any {
     // TODO improve based on schema
     return true
   }
 
   constructor(...schemas: S) {
     super({
-      oneOf: schemas.map((s) => s.schema),
+      allOf: schemas.map((s) => s.schema),
     } as AnySchemaOrAnnotation)
   }
 }
 
+function and<S extends SchemaBuilder[] = SchemaBuilder[]>(defs: S): IntersectionSchemaBuilder<S>;
+function and<S extends SchemaBuilder[] = SchemaBuilder[]>(...defs: S): IntersectionSchemaBuilder<S>;
 function and<S extends SchemaBuilder[] = SchemaBuilder[]>(
   ...schemaDefs: S
 ) {
@@ -1308,7 +1502,7 @@ function injectAjv<S extends SchemaBuilder = SchemaBuilder>(ajv: Ajv, schemaBuil
 }
 
 /**
- * Create new instance of schema with non default AJV instance
+ * Create new instance of schema definition with non default AJV instance
  */
 function create(ajv: Ajv) {
   return {

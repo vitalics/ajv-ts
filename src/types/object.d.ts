@@ -19,7 +19,7 @@ export type RequiredByKeys<T, K = keyof T> = {
   ? { [P in keyof I]: I[P] }
   : never
 
-type Merge<T> = {
+export type Merge<T> = {
   [K in keyof T]: T[K]
 }
 
@@ -47,3 +47,5 @@ export type IndexType<T, Index = unknown> = {
 } & {
     [K in string]: Index
   }
+
+export type OmitMany<T, Keys extends (string | number | symbol)[]> = Omit<T, Keys[number]>

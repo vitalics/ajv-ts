@@ -3,6 +3,7 @@ src
 tests
 .github
 .changeset
+.vscode
 
 # Files
 bun.lockb

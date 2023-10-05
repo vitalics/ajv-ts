@@ -44,3 +44,19 @@ test("parse should fail given sparse array", () => {
 
   expect(() => schema.parse(new Array(3))).toThrow();
 });
+
+
+test('invariant for array schema', () => {
+  const str = s.string().array()
+  const obj = s.object({
+    qwe: s.string().optional(),
+    num: s.number(),
+  }).array()
+
+  type Obj = s.infer<typeof obj>
+
+  type Str = s.infer<typeof str>
+
+  assertEqualType<Str, string[]>(true)
+  assertEqualType<Obj, { qwe?: string, num: number }[]>(true)
+})

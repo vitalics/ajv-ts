@@ -427,6 +427,19 @@ const O = s.object({
 type O = s.infer<typeof O> // {first: number, second?: string}
 ```
 
+### `.partialFor`
+
+Accepts keys which are partial. unset properties from `required` schema field in your JSON-schema
+
+```ts
+const O = s.object({
+  first: s.number().optional(),
+  second: s.string().optional()
+}).required().partialFor('second')
+
+type O = s.infer<typeof O> // {first: number, second?: string}
+```
+
 ### `.passthrough`
 
 By default object schemas strip out unrecognized keys during parsing.
@@ -472,10 +485,82 @@ person.parse({
 // => throws ZodError
 ```
 
+### `.dependentRequired`
+
+The `dependentRequired` keyword conditionally requires that
+certain properties must be present if a given property is
+present in an object. For example, suppose we have a schema
+representing a customer. If you have their "credit card number",
+you also want to ensure you have a "billing address".
+If you don't have their credit card number, a "billing address"
+operty
+on another using the `dependentRequired` keyword.
+The value of the `dependentRequired` keyword is an object.
+Each entry in the object maps from the name of a property, p,
+to an array of strings listing properties that are `required`
+if p is present.
+
+```ts
+const Test1 = s.object({
+  name: s.string(),
+  credit_card: s.number(),
+  billing_address: s.string(),
+  }).requiredFor('name').dependentRequired({
+    credit_card: ['billing_address'],
+  })
+
+/**
+Test1.schema === {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string" },
+      "credit_card": { "type": "number" },
+      "billing_address": { "type": "string" }
+    },
+    "required": ["name"],
+    "dependentRequired": {
+      "credit_card": ["billing_address"]
+    }
+  }
+*/
+```
+
+### `.rest`
+
+The `additionalProperties` keyword is used to control the handling of extra stuff, that is, `properties` whose names are
+not listed in the `properties` keyword or match any of the regular expressions in the `patternProperties` keyword.
+By default any additional properties are allowed.
+
+If you need to set `additionalProperties=false` use [`strict`](#strict) method
+
+```ts
+const Test = s.object({
+  street_name: s.string(),
+  street_type: s.enum(["Street", "Avenue", "Boulevard"])
+}).rest(s.string())
+
+Test.schema === {
+  "type": "object",
+  "properties": {
+    "street_name": { "type": "string" },
+    "street_type": { "enum": ["Street", "Avenue", "Boulevard"] }
+  },
+  "additionalProperties": { "type": "string" }
+}
+```
+
 ## Arrays
 
 ```typescript
 const stringArray = s.array(s.string());
+type StringArray = s.infer<typeof stringArray> // string[]
+```
+
+Or it's invariant
+
+```ts
+const stringArray = s.string().array();
+type StringArray = s.infer<typeof stringArray> // string[]
 ```
 
 ### `.element`
@@ -483,7 +568,7 @@ const stringArray = s.array(s.string());
 Use `.element` to access the schema for an element of the array.
 
 ```ts
-stringArray.element; // => string schema
+stringArray.element; // => string schema, not array schema
 ```
 
 ### `.nonempty`
@@ -491,7 +576,7 @@ stringArray.element; // => string schema
 If you want to ensure that an array contains at least one element, use `.nonempty()`.
 
 ```ts
-const nonEmptyStrings = s.string().array().nonempty();
+const nonEmptyStrings = s.array(s.string()).nonempty();
 // the inferred type is now
 // [string, ...string[]]
 
@@ -499,7 +584,7 @@ nonEmptyStrings.parse([]); // throws: "Array cannot be empty"
 nonEmptyStrings.parse(["Ariana Grande"]); // passes
 ```
 
-### `.min`/`.max`/`.length`
+### `.min`/`.max`/`.length`/`.minLength`/`.maxLength`
 
 ```ts
 s.string().array().min(5); // must contain 5 or more items
@@ -508,6 +593,19 @@ s.string().array().length(5); // must contain 5 items exactly
 ```
 
 Unlike `.nonempty()` these methods do not change the inferred type.
+
+### `.unique`
+
+Set the `uniqueItems` keyword to `true`.
+
+```ts
+const UniqueNumbers = s.array(s.number()).unique()
+
+UniqueNumbers.parse([1,2,3,4]) // Ok
+UniqueNumbers.parse([1,2,3,3]) // Error
+```
+
+### `.contains`/`.minContains`
 
 ## Tuples
 
@@ -534,9 +632,11 @@ const result = variadicTuple.parse(["hello", 1, 2, 3]);
 // => [string, ...number[]];
 ```
 
-## Unions
+## unions/or
 
 includes a built-in s.union method for composing "OR" types.
+
+This function accepts array of schemas by spread argument or array.
 
 ```ts
 const stringOrNumber = s.union([s.string(), s.number()]);
@@ -545,7 +645,19 @@ stringOrNumber.parse("foo"); // passes
 stringOrNumber.parse(14); // passes
 ```
 
-## Intersections
+Or it's invariant:
+
+```ts
+s.union(s.string(), s.number()) // string | number
+```
+
+Or it's invariant - `or` function:
+
+```ts
+s.number().or(s.string()) // number | string
+```
+
+## Intersections/and
 
 Intersections are useful for creating "logical AND" types. This is useful for intersecting two object types.
 
@@ -560,11 +672,17 @@ const Employee = s.object({
 
 const EmployedPerson = s.intersection(Person, Employee);
 
+// same as
+const EmployedPerson = s.intersection([Person, Employee]);
+
 // equivalent to:
 const EmployedPerson = Person.and(Employee);
+
+// equivalent to:
+const EmployedPerson = and(Person, Employee);
 ```
 
-Though in many cases, it is recommended to use `A.merge(B)` to merge two objects. The `.merge` method returns a new Object instance, whereas `A.and(B)` returns a less useful Intersection instance that lacks common object methods like pick and omit.
+Though in many cases, it is recommended to use `A.merge(B)` to merge two objects. The `.merge` method returns a new Object instance, whereas `A.and(B)` returns a less useful Intersection instance that lacks common object methods like `pick` and `omit`.
 
 ```ts
 const a = s.union([s.number(), s.string()]);

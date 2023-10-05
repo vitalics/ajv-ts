@@ -4,3 +4,7 @@ export type Length<S extends string, C extends number[] = []> = S extends `${inf
   : C['length']
 
 export type Reverse<S extends string> = S extends `${infer First}${infer Rest}` ? `${Reverse<Rest>}${First}` : ''
+
+export type UUID = `${string}-${string}-${string}-${string}-${string}`
+
+export type Email = `${string}@${string}.${string}`
