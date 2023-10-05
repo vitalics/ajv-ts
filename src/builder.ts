@@ -76,7 +76,6 @@ abstract class SchemaBuilder<
   }
   protected isNullable = false
 
-
   /**
    * Marks your property as nullable (`undefined`)
    * 
@@ -307,63 +306,7 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
   constructor() {
     super({ type: 'number' })
   }
-  private setType(type: string): () => this {
-    return () => {
-      this.schema.type = type as never
-      return this
-    }
-  }
 
-
-  /**
-   * signed byte value (-128 .. 127)
-   * 
-   * Set schema `{type: 'int8'}`
-   */
-  int8 = this.setType('int8')
-  /**
-   * unsigned byte value (0 .. 255)
-   * 
-   * Set schema `{type: 'uint8'}`
-   */
-  uint8 = this.setType('uint8')
-  /**
-   * signed word value (-32768 .. 32767),
-   * 
-   * Set schema `{type: 'int16'}`
-   */
-  int16 = this.setType('int16')
-  /**
-   * unsigned word value (0 .. 65535)
-   *
-   * Set schema `{type: 'uint16'}`
-   */
-  uint16 = this.setType('uint16')
-  /** 
-   * signed 32-bit integer value
-   * 
-   * Set schema `{type: 'int32'}`
-   * 
-   */
-  int32 = this.setType('int32')
-  /**
-   * unsigned 32-bit integer value
-   * 
-   * Set schema `{type: 'uint32'}`
-   */
-  uint32 = this.setType('uint32')
-  /**
-   * 32-bit real number
-   * 
-   * Set schema `{type: 'float32'}`
-   */
-  float32 = this.setType('float32')
-  /**
-   * 64-bit real number
-   * 
-   * Set schema `{type: 'float64'}`
-   */
-  float64 = this.setType('float64')
   /**
    * change schema type from `any integer number` to `any number`.
    * 
@@ -371,10 +314,16 @@ class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
    * 
    * This is default behavior
    */
-  number = this.setType('number')
+  number() {
+    this.schema.type = 'number'
+    return this
+  }
 
   /** Set schema `{type: 'integer'}` */
-  integer = this.setType('integer')
+  integer() {
+    this.schema.type = 'integer'
+    return this
+  }
 
   /**
    * Appends format for your number schema.
