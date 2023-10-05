@@ -47,3 +47,5 @@ export type IndexType<T, Index = unknown> = {
 } & {
     [K in string]: Index
   }
+
+export type OmitMany<T, Keys extends (string | number | symbol)[]> = Omit<T, Keys[number]>

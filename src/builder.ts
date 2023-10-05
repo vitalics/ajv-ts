@@ -4,6 +4,8 @@ import addFormats from 'ajv-formats'
 import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, } from './types/index'
 import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
 import type { IsPositiveInteger } from './types/number'
+import { Email, UUID } from './types/string'
+import { OmitMany } from './types/object'
 
 export const DEFAULT_AJV = addFormats(new Ajv({}))
 /** Any schema builder. */
@@ -172,20 +174,37 @@ abstract class SchemaBuilder<
     return array(this)
   }
 
+  /**
+   * Same as `s.and()`. Combine current type with another. Logical "AND"
+   * 
+   * Typescript `A & B`
+   */
   intersection = this.and
-
+  /**
+   * Same as `s.and()`. Combine current type with another. Logical "AND"
+   *
+   * Typescript `A & B`
+   */
   and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(defs: S): IntersectionSchemaBuilder<[this, ...S]>
   and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...defs: S): IntersectionSchemaBuilder<[this, ...S]>
   and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...others: S): IntersectionSchemaBuilder<[this, ...S]> {
     return and(this, ...others)
   }
-
+  /**
+   * Same as `s.or()`. Combine current type with another type. Logical "OR"
+   * 
+   * Typescript "A | B"
+   */
   or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(defs: S): UnionSchemaBuilder<[this, ...S]>
   or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...defs: S): UnionSchemaBuilder<[this, ...S]>
   or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...others: S): UnionSchemaBuilder<[this, ...S]> {
     return or(this, ...others)
   }
-
+  /**
+   * Same as `s.or()`. Combine current type with another type. Logical "OR"
+   * 
+   * Typescript "A | B"
+   */
   union = this.or
 
   /**
@@ -524,8 +543,8 @@ function integer() {
   return new NumberSchemaBuilder().integer()
 }
 
-class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
-  protected precheck(arg: unknown): arg is string {
+class StringSchemaBuilder<S extends string = string> extends SchemaBuilder<S, StringSchema> {
+  protected precheck(arg: unknown): arg is S {
     if (
       !!this.isNullable &&
       (typeof arg === 'string' || typeof arg === 'undefined' || arg === null)
@@ -538,23 +557,64 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
     return false
   }
 
+  /**
+   * The `pattern` and `patternProperties` keywords use regular expressions to express constraints.
+   * The regular expression syntax used is from JavaScript ({@link https://www.ecma-international.org/publications-and-standards/standards/ecma-262/ ECMA 262}, specifically).
+   * However, that complete syntax is not widely supported, therefore it is recommended that you stick to the subset of that syntax described below.
+   * 
+   * - A single unicode character (other than the special characters below) matches itself.
+   * - `.`: Matches any character except line break characters. (Be aware that what constitutes a line break character is somewhat dependent on your platform and language environment, but in practice this rarely matters).
+   * - `^`: Matches only at the beginning of the string.
+   * - `$`: Matches only at the end of the string.
+   * - `(...)`: Group a series of regular expressions into a single regular expression.
+   * - `|`: Matches either the regular expression preceding or following the | symbol.
+   * - `[abc]`: Matches any of the characters inside the square brackets.
+   * - `[a-z]`: Matches the range of characters.
+   * - `[^abc]`: Matches any character not listed.
+   * - `[^a-z]`: Matches any character outside of the range.
+   * - `+`: Matches one or more repetitions of the preceding regular expression.
+   * - `*`: Matches zero or more repetitions of the preceding regular expression.
+   * - `?`: Matches zero or one repetitions of the preceding regular expression.
+   * - `+?`, `*?`, `??`: The *, +, and ? qualifiers are all greedy; they match as much text as possible. Sometimes this behavior isn't desired and you want to match as few characters as possible.
+   * - `(?!x)`, `(?=x)`: Negative and positive lookahead.
+   * - `{x}`: Match exactly x occurrences of the preceding regular expression.
+   * - `{x,y}`: Match at least x and at most y occurrences of the preceding regular expression.
+   * - `{x,}`: Match x occurrences or more of the preceding regular expression.
+   * - `{x}?`, `{x,y}?`, `{x,}?`: Lazy versions of the above expressions.
+   * @example
+   * const phoneNumber = s.string().pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$")
+   * 
+   * phoneNumber.parse("555-1212") // OK
+   * phoneNumber.parse("(888)555-1212") // OK
+   * phoneNumber.parse("(888)555-1212 ext. 532") // Error
+   * phoneNumber.parse("(800)FLOWERS") // Error
+   * // typescript custom type
+   * const prefixS = s.string().pattern<`S_${string}`>("^S_$")
+   * type S = s.infer<typeof prefixS> // `S_${string}`
+   * const str1 = prefixS.parse("qwe") // Error
+   * const str2 = prefixS.parse("S_Some") // OK
+   */
   pattern<Pattern extends string = string>(
-    regex: RegExp | string,
-  ): SchemaBuilder<string, StringSchema, `${Pattern}`> {
-    if (typeof regex === 'string') {
-      this.schema.pattern = `^${regex}$`
-    } else {
-      this.schema.pattern = `^${regex.source}$`
-    }
-    return this as SchemaBuilder<string, StringSchema, `${Pattern}`>
+    pattern: string,
+  ): StringSchemaBuilder<Pattern> {
+    this.schema.pattern = pattern
+    return this as never
   }
 
   constructor() {
     super({ type: 'string' })
   }
 
+  const<V extends string>(value: V): StringSchemaBuilder<V> {
+    this.schema.const = value
+    return this as never
+  }
+
   /**
-   * Define minimum string length
+   * Define minimum string length.
+   * 
+   * Same as `min`
+   * @see {@link StringSchemaBuilder.min min}
    */
   minLength<L extends number, Valid = IsPositiveInteger<L>>(
     value: Valid extends true
@@ -568,9 +628,19 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
     this.schema.minLength = value as L
     return this
   }
+  /**
+   * Define minimum string length.
+   * 
+   * Same as `minLength`
+   * @see {@link StringSchemaBuilder.minLength minLength}
+   */
+  min = this.minLength
 
   /**
-   * Define maximum string length
+   * Define maximum string length.
+   * 
+   * Same as `max`
+   * @see {@link StringSchemaBuilder.max max}
    */
   maxLength<L extends number, Valid = IsPositiveInteger<L>>(
     value: Valid extends true
@@ -585,7 +655,18 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
     return this
   }
   /**
+   * Define maximum string length.
+   * 
+   * Same as `maxLength`
+   * @see {@link StringSchemaBuilder.maxLength maxLength}
+   */
+  max = this.maxLength
+
+  /**
    * Define exact string length
+   * 
+   * Same as `s.string().min(v).max(v)`
+   * 
    * @see {@link StringSchemaBuilder.minLength minLength}
    * @see {@link StringSchemaBuilder.maxLength maxLength}
    * @example
@@ -612,16 +693,74 @@ class StringSchemaBuilder extends SchemaBuilder<string, StringSchema> {
     return this.minLength(1)
   }
 
-  email() {
-    return this.format('email')
+  /**
+   * A string is valid against this format if it represents a valid e-mail address format.
+   * 
+   * Example: `some@gmail.com`
+   */
+  email(): OmitMany<StringSchemaBuilder<Email>, ['format', 'ipv4', 'ipv6', 'time', 'date', 'dateTime', 'regex', 'uuid', 'email']> {
+    return this.format('email') as never
   }
   ipv4() {
     return this.format('ipv4')
   }
+  ipv6() {
+    return this.format('ipv6')
+  }
+  /**
+   * A Universally Unique Identifier as defined by {@link https://datatracker.ietf.org/doc/html/rfc4122 RFC 4122}.
+   * 
+   * Same as `s.string().format('uuid')`
+   * 
+   * Example: `3e4666bf-d5e5-4aa7-b8ce-cefe41c7568a`
+   */
+  uuid() {
+    return this.format('uuid')
+  }
+  /**
+   * A string is valid against this format if it represents a time in the following format: `hh:mm:ss.sTZD`.
+   * 
+   * Same as `s.string().format('time')`
+   * 
+   * Example: `20:20:39+00:00`
+   */
+  time() {
+    return this.format('time')
+  }
+  /**
+   * A string is valid against this format if it represents a date in the following format: `YYYY-MM-DD`.
+   *
+   * Same as `s.string().format('date')`
+   * 
+   * Example: `2023-10-10`
+   */
+  date() {
+    return this.format('date')
+  }
 
-  format(formatType: StringSchema['format']): Omit<this, 'format'> {
+  /**
+   * A string is valid against this format if it represents a date-time in the following format: `YYYY:MM::DDThh:mm:ss.sTZD`.
+   * 
+   * Same as `s.string().format('date-time')`
+   * 
+   * Example: `2023-10-05T05:49:37.757Z`
+   */
+  dateTime() {
+    return this.format('date-time')
+  }
+
+  /**
+   * A string is valid against this format if it represents a valid regular expression.
+   * 
+   * Same as `s.string().format('regex')`
+   */
+  regex() {
+    return this.format('regex')
+  }
+
+  format(formatType: StringSchema['format']): OmitMany<StringSchemaBuilder<UUID>, ['format', 'ipv4', 'ipv6', 'time', 'date', 'dateTime', 'regex', 'uuid', 'email']> {
     this.schema.format = formatType
-    return this
+    return this as never
   }
 }
 
