@@ -179,7 +179,7 @@ abstract class SchemaBuilder<
    * 
    * Typescript `A & B`
    */
-  intersection = this.and
+  intersection: typeof this.and = this.and
   /**
    * Same as `s.and()`. Combine current type with another. Logical "AND"
    *
@@ -205,7 +205,7 @@ abstract class SchemaBuilder<
    * 
    * Typescript "A | B"
    */
-  union = this.or
+  union: typeof this.or = this.or
 
   /**
    * Parse you input result. Used `ajv.validate` under the hood

@@ -19,7 +19,7 @@ export type RequiredByKeys<T, K = keyof T> = {
   ? { [P in keyof I]: I[P] }
   : never
 
-type Merge<T> = {
+export type Merge<T> = {
   [K in keyof T]: T[K]
 }
 
