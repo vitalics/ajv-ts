@@ -4,10 +4,10 @@ import addFormats from 'ajv-formats'
 import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, } from './types/index'
 import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
 import type { IsPositiveInteger } from './types/number'
-import { Email, UUID } from './types/string'
-import { OmitMany } from './types/object'
+import type { Email, UUID } from './types/string'
+import type { OmitMany } from './types/object'
 
-export const DEFAULT_AJV = addFormats(new Ajv({}))
+export const DEFAULT_AJV = addFormats(new Ajv())
 /** Any schema builder. */
 type AnySchemaBuilder =
   | NumberSchemaBuilder
@@ -75,6 +75,26 @@ abstract class SchemaBuilder<
     this.schema = schema
   }
   protected isNullable = false
+
+  /**
+   * set custom JSON-schema fiel. Useful if you need to declare something but no api founded for built-in solution.
+   *
+   * Example: "If-Then-Else" which you cannot declare without `custom` method.
+   * @example
+   * const myObj = s.object({
+   *  foo: s.string(),
+   *  bar: s.string()
+   * }).custom('if', {
+   *  "properties": {
+   *    "foo": { "const": "bar" }
+   *  },
+   *  "required": ["foo"]
+   *  }).custom('then', { "required": ["bar"] })
+   */
+  custom<V = unknown, Result extends SchemaBuilder = this>(key: string, value: V): Result {
+    (this.schema as Record<string, unknown>)[key] = value
+    return this as never
+  }
 
   /**
    * Marks your property as nullable (`undefined`)
@@ -790,7 +810,7 @@ class ObjectSchemaBuilder<
    * Opposite of `strict`
    * @see {@link ObjectSchemaBuilder.strict strict}
    */
-  passthrough(): ObjectSchemaBuilder<Definition, ObjectTypes.IndexType<T>> {
+  passthrough(): ObjectSchemaBuilder<Definition, T & ObjectTypes.IndexType<T>, ObjectTypes.IndexType<T>> {
     this.schema.additionalProperties = true
     return this as never
   }

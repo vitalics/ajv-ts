@@ -306,7 +306,7 @@ test("passthrough index signature", () => {
   assertEqualType<{ a: string }, a>(true);
   const b = a.passthrough();
   type b = s.infer<typeof b>;
-  assertEqualType<{ [k: string]: unknown }, b>(true);
+  assertEqualType<{ a: string } & { [k: string]: unknown }, b>(true);
 });
 
 test('[json schema] dependant requirements', () => {
