@@ -1,5 +1,11 @@
 # ajv-ts
 
+## 0.3.1
+
+### Patch Changes
+
+- bf9a916: Add generics parameters for number and string builders
+
 ## 0.3.0
 
 ### Minor Changes
