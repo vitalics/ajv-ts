@@ -312,7 +312,7 @@ abstract class SchemaBuilder<
     return result.data
   }
 }
-class NumberSchemaBuilder extends SchemaBuilder<number, NumberSchema> {
+class NumberSchemaBuilder<N extends number = number> extends SchemaBuilder<number, NumberSchema, N> {
   protected precheck(arg: unknown): arg is number {
     if (typeof arg === 'number') {
       return true
@@ -512,8 +512,8 @@ function integer() {
   return new NumberSchemaBuilder().integer()
 }
 
-class StringSchemaBuilder<S extends string = string> extends SchemaBuilder<S, StringSchema> {
-  protected precheck(arg: unknown): arg is S {
+class StringSchemaBuilder<S extends string = string> extends SchemaBuilder<string, StringSchema, S> {
+  protected precheck(arg: unknown): arg is string {
     if (
       !!this.isNullable &&
       (typeof arg === 'string' || typeof arg === 'undefined' || arg === null)
@@ -727,17 +727,17 @@ class StringSchemaBuilder<S extends string = string> extends SchemaBuilder<S, St
     return this.format('regex')
   }
 
-  format(formatType: StringSchema['format']): OmitMany<StringSchemaBuilder<UUID>, ['format', 'ipv4', 'ipv6', 'time', 'date', 'dateTime', 'regex', 'uuid', 'email']> {
+  format(formatType: StringSchema['format']): this {
     this.schema.format = formatType
-    return this as never
+    return this
   }
 }
 
 /**
  * Construct `string` schema
  */
-function string() {
-  return new StringSchemaBuilder()
+function string<S extends string = string>() {
+  return new StringSchemaBuilder<S>()
 }
 
 class BooleanSchemaBuilder extends SchemaBuilder<boolean, BooleanSchema> {
