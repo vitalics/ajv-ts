@@ -189,9 +189,11 @@ abstract class SchemaBuilder<
     return this;
   }
   /**
-   * Defines custom error message. Error object uses {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause `cause`} property
+   * Defines custom error message for any error.
    * 
-   * Set `schema.errorMessage = message` 
+   * Error object uses {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause `cause`} property
+   * 
+   * Set `schema.errorMessage = message`
    */
   error(message: string){
     (this.schema as AnySchema).errorMessage = message
