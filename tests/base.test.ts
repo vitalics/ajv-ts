@@ -26,3 +26,13 @@ test("test this binding", () => {
   expect(callback((value) => s.string().safeParse(value).success)).toBe(true); // true
   expect(callback((value) => s.string().safeParse(value).success)).toBe(true); // true
 });
+
+test('cusom error support', () => {
+  const schema = s.number().error('this is not a number')
+
+  const { error } = schema.safeParse("not a number")
+
+  expect(error).toBeInstanceOf(Error)
+  expect(error?.message).toBe("this is not a number")
+  expect(error?.cause).toBeDefined()
+})

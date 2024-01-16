@@ -1,13 +1,14 @@
-import Ajv from 'ajv'
+import Ajv, { ErrorObject } from 'ajv'
 import addFormats from 'ajv-formats'
+import ajvErrors from 'ajv-errors'
 
 import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, } from './types/index'
 import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
 import type { IsPositiveInteger } from './types/number'
-import type { Email, UUID } from './types/string'
+import type { Email } from './types/string'
 import type { OmitMany } from './types/object'
 
-export const DEFAULT_AJV = addFormats(new Ajv())
+export const DEFAULT_AJV = ajvErrors(addFormats(new Ajv({ allErrors: true })))
 /** Any schema builder. */
 type AnySchemaBuilder =
   | NumberSchemaBuilder
@@ -33,7 +34,8 @@ export type SafeParseResult<T> = SafeParseSuccessResult<T> | SafeParseErrorResul
 export type SafeParseSuccessResult<T> = {
   success: true;
   data: T;
-  input: unknown
+  input: unknown;
+  error?: Error
 }
 export type SafeParseErrorResult = {
   success: false
@@ -159,7 +161,6 @@ abstract class SchemaBuilder<
     return this as never
   }
 
-  protected abstract precheck(arg: unknown): arg is Input
 
   /**
    * Meta object. Add additional fields in your schema
@@ -187,6 +188,17 @@ abstract class SchemaBuilder<
     (this.schema as AnySchema).default = value
     return this;
   }
+  /**
+   * Defines custom error message for any error.
+   * 
+   * Error object uses {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause `cause`} property
+   * 
+   * Set `schema.errorMessage = message`
+   */
+  error(message: string){
+    (this.schema as AnySchema).errorMessage = message
+    return this
+  }
 
   /** Construct Array schema. Same as `s.array(s.number())` */
   array() {
@@ -212,7 +224,7 @@ abstract class SchemaBuilder<
   /**
    * Same as `s.or()`. Combine current type with another type. Logical "OR"
    * 
-   * Typescript "A | B"
+   * Typescript: `A | B`
    */
   or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(defs: S): UnionSchemaBuilder<[this, ...S]>
   or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...defs: S): UnionSchemaBuilder<[this, ...S]>
@@ -222,7 +234,7 @@ abstract class SchemaBuilder<
   /**
    * Same as `s.or()`. Combine current type with another type. Logical "OR"
    * 
-   * Typescript "A | B"
+   * Typescript: `A | B`
    */
   union: typeof this.or = this.or
 
@@ -251,16 +263,6 @@ abstract class SchemaBuilder<
       transformed = input
     }
 
-    const precheckValid = this.precheck(transformed)
-    if (!precheckValid) {
-      return {
-        error: new Error(
-          `Validation error: precheck condition for "${this.constructor.name
-          }" constructor is failed. Received: ${transformed} with type "${typeof transformed}"`,
-        ),
-        success: false,
-      } as SafeParseErrorResult
-    }
     try {
       const valid: boolean = this.ajv.validate(this.schema, transformed)
       if (!valid) {
@@ -313,16 +315,6 @@ abstract class SchemaBuilder<
   }
 }
 class NumberSchemaBuilder<N extends number = number> extends SchemaBuilder<number, NumberSchema, N> {
-  protected precheck(arg: unknown): arg is number {
-    if (typeof arg === 'number') {
-      return true
-    }
-    if ((arg === null || arg === undefined) && this.isNullable) {
-      return true
-    }
-    return false
-  }
-
   constructor() {
     super({ type: 'number' })
   }
@@ -512,19 +504,7 @@ function integer() {
   return new NumberSchemaBuilder().integer()
 }
 
-class StringSchemaBuilder<S extends string = string> extends SchemaBuilder<string, StringSchema, S> {
-  protected precheck(arg: unknown): arg is string {
-    if (
-      !!this.isNullable &&
-      (typeof arg === 'string' || typeof arg === 'undefined' || arg === null)
-    ) {
-      return true
-    }
-    if (typeof arg === 'string') {
-      return true
-    }
-    return false
-  }
+class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder<string, StringSchema, S> {
 
   /**
    * The `pattern` and `patternProperties` keywords use regular expressions to express constraints.
@@ -736,19 +716,11 @@ class StringSchemaBuilder<S extends string = string> extends SchemaBuilder<strin
 /**
  * Construct `string` schema
  */
-function string<S extends string = string>() {
+function string<const S extends string = string>() {
   return new StringSchemaBuilder<S>()
 }
 
 class BooleanSchemaBuilder extends SchemaBuilder<boolean, BooleanSchema> {
-  protected precheck(arg: unknown): arg is boolean {
-    if (typeof arg === 'boolean') {
-      return true
-    } if ((arg === null || arg === undefined) && this.isNullable) {
-      return true
-    }
-    return false
-  }
 
   constructor() {
     super({ type: 'boolean' })
@@ -765,13 +737,6 @@ class NullSchemaBuilder extends SchemaBuilder<null, NullSchema> {
   constructor() {
     super({ type: 'null' })
   }
-
-  protected precheck(arg: unknown): arg is null {
-    if (arg === null || arg === undefined) {
-      return true
-    }
-    return false
-  }
 }
 function nil() {
   return new NullSchemaBuilder()
@@ -784,14 +749,6 @@ class ObjectSchemaBuilder<
   T = { [K in keyof Definition]: Infer<Definition[K]> },
   Out = ObjectTypes.OptionalUndefined<T>
 > extends SchemaBuilder<T, ObjectSchema, Out> {
-  protected precheck(arg: unknown): arg is T {
-    if (typeof arg === 'object' && arg !== null) {
-      return true
-    } if ((arg === null || arg === undefined) && this.isNullable) {
-      return true
-    }
-    return false
-  }
 
   constructor(private def: Definition) {
     super({
@@ -1061,15 +1018,6 @@ function object<
 }
 
 class RecordSchemaBuilder<ValueDef extends AnySchemaBuilder = AnySchemaBuilder> extends SchemaBuilder<Record<string, Infer<ValueDef>>, ObjectSchema>{
-  protected precheck(arg: unknown): arg is Record<string | number, Infer<ValueDef>> {
-    if (typeof arg === 'object' && arg !== null) {
-      return true;
-    }
-    if (this.isNullable && (arg === null || arg === undefined)) {
-      return true;
-    }
-    return false
-  }
 
   constructor(def: ValueDef) {
     super({
@@ -1095,14 +1043,6 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
   T,
   ArraySchema
 > {
-  protected precheck(arg: unknown): arg is T {
-    if (Array.isArray(arg)) {
-      return true
-    } if ((arg === null || arg === undefined) && this.isNullable) {
-      return true
-    }
-    return false
-  }
 
   constructor(private definition: SchemaBuilder) {
     super({ type: 'array', items: [definition.schema], minItems: 0 })
@@ -1265,14 +1205,6 @@ type OutputTypeOfTupleWithRest<
 class TupleSchemaBuilder<
   Schemas extends TupleItems | [] = TupleItems,
 > extends SchemaBuilder<OutputTypeOfTupleWithRest<Schemas>, ArraySchema> {
-  protected precheck(arg: unknown): arg is any {
-    if (Array.isArray(arg)) {
-      return true
-    } if ((arg === null || arg === undefined) && this.isNullable) {
-      return true
-    }
-    return false
-  }
   constructor(...defs: Schemas) {
     super({ type: 'array', items: defs.map(def => def.schema), additionalItems: false, minItems: 1 })
   }
@@ -1307,10 +1239,6 @@ class EnumSchemaBuilder<
 
   readonly options = [] as unknown as Tuple
 
-  protected precheck(arg: unknown): arg is Tuple {
-    return true
-  }
-
   constructor(values: Tuple) {
     // TODO: warning about tuple appears here in strict mode. Need to declare `type` field
     super({ enum: values as never })
@@ -1330,9 +1258,6 @@ class EnumSchemaBuilder<
 type EnumLike = { [k: string]: string | number;[nu: number]: string }
 
 class NativeEnumSchemaBuilder<T extends EnumLike> extends SchemaBuilder<T, EnumAnnotation>{
-  protected precheck(arg: unknown): arg is T {
-    return true
-  }
   get enum(): T {
     return this.enumValues
   }
@@ -1370,10 +1295,6 @@ function makeEnum(tupleOrEnum: unknown) {
 class ConstantSchemaBuilder<
   T extends number | string | boolean | null | object = never,
 > extends SchemaBuilder<T, ConstantAnnotation> {
-  protected precheck(arg: unknown): arg is T {
-    // TODO: add check for object equantity, since {} === {} => false
-    return this.schema.const === arg
-  }
 
   constructor(readonly value: T) {
     super({ const: value })
@@ -1389,10 +1310,7 @@ function constant<T extends number | string | boolean | null | object>(
 class UnionSchemaBuilder<
   S extends SchemaBuilder[] = SchemaBuilder[],
 > extends SchemaBuilder<Infer<S[number]>, AnySchemaOrAnnotation> {
-  protected precheck(arg: unknown): arg is Infer<S[number]> {
-    // TODO: improve based on schema
-    return true
-  }
+
 
   constructor(...schemas: S) {
     super({
@@ -1417,10 +1335,7 @@ class IntersectionSchemaBuilder<
   Infer<Intersection>,
   AnySchemaOrAnnotation
 > {
-  protected precheck(arg: unknown): arg is any {
-    // TODO improve based on schema
-    return true
-  }
+
 
   constructor(...schemas: S) {
     super({
@@ -1438,9 +1353,6 @@ function and<S extends SchemaBuilder[] = SchemaBuilder[]>(
 }
 
 class UnknownsSchemaBuilder<T extends unknown | any> extends SchemaBuilder<T, AnySchemaOrAnnotation>{
-  protected precheck(arg: unknown): arg is T {
-    return true
-  }
   constructor() {
     super({} as AnySchemaOrAnnotation)
   }
@@ -1468,6 +1380,12 @@ function injectAjv<S extends SchemaBuilder = SchemaBuilder>(ajv: Ajv, schemaBuil
       return result
     },
   })
+}
+
+class AjvTsError extends Error {
+  constructor(readonly issues: ErrorObject[] = []) {
+    super()
+  }
 }
 
 /**
