@@ -1,5 +1,57 @@
 # ajv-ts
 
+## Table of Contents
+
+- [ajv-ts](#ajv-ts)
+  - [Table of Contents](#table-of-contents)
+  - [Zod unsupported APIs/differences](#zod-unsupported-apisdifferences)
+  - [Installation](#installation)
+  - [Basic usage](#basic-usage)
+  - [Primitives](#primitives)
+  - [Constant values(literals)](#constant-valuesliterals)
+  - [String](#string)
+  - [Numbers](#numbers)
+  - [BigInts](#bigints)
+  - [NaNs](#nans)
+  - [Dates](#dates)
+  - [Enums](#enums)
+    - [Autocompletion](#autocompletion)
+  - [Native enums](#native-enums)
+  - [Optionals](#optionals)
+  - [Nullables](#nullables)
+  - [Objects](#objects)
+    - [`.keyof`](#keyof)
+    - [`.extend`](#extend)
+    - [`.merge`](#merge)
+    - [`.pick`/`.omit`](#pickomit)
+    - [`.partial`](#partial)
+    - [`.required`](#required)
+    - [`.requiredFor`](#requiredfor)
+    - [`.partialFor`](#partialfor)
+    - [`.passthrough`](#passthrough)
+    - [`.strict`](#strict)
+    - [`.dependentRequired`](#dependentrequired)
+    - [`.rest`](#rest)
+  - [Arrays](#arrays)
+    - [`.element`](#element)
+    - [`.nonempty`](#nonempty)
+    - [`.min`/`.max`/`.length`/`.minLength`/`.maxLength`](#minmaxlengthminlengthmaxlength)
+    - [`.unique`](#unique)
+    - [`.contains`/`.minContains`](#containsmincontains)
+  - [Tuples](#tuples)
+  - [unions/or](#unionsor)
+  - [Intersections/and](#intersectionsand)
+  - [Set](#set)
+  - [Map](#map)
+  - [`any`/`unknown`](#anyunknown)
+  - [`never`](#never)
+  - [`not`/`exclude`](#notexclude)
+  - [Custom Ajv instance](#custom-ajv-instance)
+  - [`custom` shema definition](#custom-shema-definition)
+  - [Transformations](#transformations)
+    - [Preprocess](#preprocess)
+    - [Postprocess](#postprocess)
+
 JSON schema builder like in ZOD-like API
 
 > TypeScript schema validation with static type inference!
@@ -15,7 +67,7 @@ We inspired API from `zod`. So you just can reimport you api and that's it!
 
 ## Zod unsupported APIs/differences
 
-1. `s.date`, `s.symbol`, `s.void`, `s.void`, `s.never`, `s.bigint`, `s.function` does not supported. Since JSON-schema doesn't define `Date`, `Symbol`, `void`, `never`, `function`, `Set`, `Map` as separate type. For strings you can use `s.string().format('date-time')` or other JSON-string format compatibility: https://json-schema.org/understanding-json-schema/reference/string.html
+1. `s.date`, `s.symbol`, `s.void`, `s.void`, `s.bigint`, `s.function` does not supported. Since JSON-schema doesn't define `Date`, `Symbol`, `void`, `function`, `Set`, `Map` as separate type. For strings you can use `s.string().format('date-time')` or other JSON-string format compatibility: https://json-schema.org/understanding-json-schema/reference/string.html
 2. `s.null` === `s.undefined` - same types, but helps typescript with autocompletion
 3. `z.enum` and `z.nativeEnum` it's a same as `s.enum`. We make enums fully compatible, it can be array of strings or structure defined with `enum` keyword in typescript
 4. Exporting `s` isntead of `z`, since `s` - is a shorthand for `schema`
@@ -636,19 +688,13 @@ const result = variadicTuple.parse(["hello", 1, 2, 3]);
 
 includes a built-in s.union method for composing "OR" types.
 
-This function accepts array of schemas by spread argument or array.
+This function accepts array of schemas by spread argument.
 
 ```ts
-const stringOrNumber = s.union([s.string(), s.number()]);
+const stringOrNumber = s.union(s.string(), s.number());
 
 stringOrNumber.parse("foo"); // passes
 stringOrNumber.parse(14); // passes
-```
-
-Or it's invariant:
-
-```ts
-s.union(s.string(), s.number()) // string | number
 ```
 
 Or it's invariant - `or` function:
@@ -659,7 +705,7 @@ s.number().or(s.string()) // number | string
 
 ## Intersections/and
 
-Intersections are useful for creating "logical AND" types. This is useful for intersecting two object types.
+Intersections are "logical AND" types. This is useful for intersecting two object types.
 
 ```ts
 const Person = s.object({
@@ -672,9 +718,6 @@ const Employee = s.object({
 
 const EmployedPerson = s.intersection(Person, Employee);
 
-// same as
-const EmployedPerson = s.intersection([Person, Employee]);
-
 // equivalent to:
 const EmployedPerson = Person.and(Employee);
 
@@ -685,8 +728,8 @@ const EmployedPerson = and(Person, Employee);
 Though in many cases, it is recommended to use `A.merge(B)` to merge two objects. The `.merge` method returns a new Object instance, whereas `A.and(B)` returns a less useful Intersection instance that lacks common object methods like `pick` and `omit`.
 
 ```ts
-const a = s.union([s.number(), s.string()]);
-const b = s.union([s.number(), s.boolean()]);
+const a = s.union(s.number(), s.string());
+const b = s.union(s.number(), s.boolean());
 const c = s.intersection(a, b);
 
 type c = s.infer<typeof c>; // => number
@@ -703,6 +746,40 @@ Not supported
 ## `any`/`unknown`
 
 Any and unknown defines `{}` (empty object) as JSON-schema. very useful if you need to create something specific
+
+## `never`
+
+Never defines using `{not: {}}` (empty not). Any given json schema will be fails.
+
+## `not`/`exclude`
+
+Here is a 2 differences between `not` and `exclude`.
+
+- `not` method wrap given schema with `not`
+- `exclude(schema)` - add `not` keyword for incoming `schema` argument
+
+Example:
+
+```ts
+import s from 'ajv-ts'
+
+// not
+const notAString = s.string().not() // or s.not(s.string())
+
+notAString.valid('random string') // false, this is a string
+notAString.valid(123) // true
+
+// exclude
+const notJohn = s.string().exclude(s.const('John'))
+
+notJohn.valid('random string') // true
+notJohn.valid('John') // false, this is John
+
+// advanced usage
+
+const str = s.string<'John' | 'Mary'>().exclude(s.const('John'))
+s.infer<typeof str> // 'Mary'
+```
 
 ## Custom Ajv instance
 

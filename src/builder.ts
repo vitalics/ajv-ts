@@ -1,4 +1,4 @@
-import Ajv, { ErrorObject } from 'ajv'
+import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
 import ajvErrors from 'ajv-errors'
 
@@ -6,7 +6,8 @@ import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, } from '
 import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
 import type { IsPositiveInteger } from './types/number'
 import type { Email } from './types/string'
-import type { OmitMany } from './types/object'
+import type { OmitByValue, OmitMany } from './types/object'
+import { ExcludeArr } from './types/array'
 
 export const DEFAULT_AJV = ajvErrors(addFormats(new Ajv({ allErrors: true })))
 /** Any schema builder. */
@@ -23,6 +24,9 @@ type AnySchemaBuilder =
   | ConstantSchemaBuilder
   | UnionSchemaBuilder
   | IntersectionSchemaBuilder
+  | UnknownSchemaBuilder<unknown>
+  | UnknownSchemaBuilder<any>
+  | NotSchemaBuilder
 
 type MetaObject = Pick<BaseSchema, 'title'> &
   Pick<BaseSchema, 'description'> &
@@ -79,9 +83,9 @@ abstract class SchemaBuilder<
   protected isNullable = false
 
   /**
-   * set custom JSON-schema fiel. Useful if you need to declare something but no api founded for built-in solution.
+   * set custom JSON-schema field. Useful if you need to declare something but no api founded for built-in solution.
    *
-   * Example: "If-Then-Else" which you cannot declare without `custom` method.
+   * Example: `If-Then-Else` you cannot declare without `custom` method.
    * @example
    * const myObj = s.object({
    *  foo: s.string(),
@@ -108,7 +112,12 @@ abstract class SchemaBuilder<
   }
 
   /**
-   * Marks your property as nullable (`null`)
+   * Marks your property as nullable (`null`).
+   * 
+   * Update `type` property for your schema.
+   * @example
+   * const schemaDef = s.string().nullable()
+   * schemaDef.schema // { type: ['string', 'null'], nullable: true }
    */
   nullable(): SchemaBuilder<Input, Schema, Output | null> {
     this.isNullable = true;
@@ -195,12 +204,16 @@ abstract class SchemaBuilder<
    * 
    * Set `schema.errorMessage = message`
    */
-  error(message: string){
+  error(message: string) {
     (this.schema as AnySchema).errorMessage = message
     return this
   }
 
-  /** Construct Array schema. Same as `s.array(s.number())` */
+  /**
+   * Construct Array schema. Same as `s.array(s.number())`
+   * 
+   * @see {@link array}
+   */
   array() {
     return array(this)
   }
@@ -216,18 +229,18 @@ abstract class SchemaBuilder<
    *
    * Typescript `A & B`
    */
-  and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(defs: S): IntersectionSchemaBuilder<[this, ...S]>
-  and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...defs: S): IntersectionSchemaBuilder<[this, ...S]>
-  and<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...others: S): IntersectionSchemaBuilder<[this, ...S]> {
-    return and(this, ...others)
+  and<
+    S extends AnySchemaBuilder[] = AnySchemaBuilder[],
+    Arr extends AnySchemaBuilder[] = [this, ...S]
+  // @ts-ignore - IntersectionSchemaBuilder circular return itself 2577
+  >(...others: S): IntersectionSchemaBuilder<Arr> {
+    return and(this, ...others) as never
   }
   /**
    * Same as `s.or()`. Combine current type with another type. Logical "OR"
    * 
    * Typescript: `A | B`
    */
-  or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(defs: S): UnionSchemaBuilder<[this, ...S]>
-  or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...defs: S): UnionSchemaBuilder<[this, ...S]>
   or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...others: S): UnionSchemaBuilder<[this, ...S]> {
     return or(this, ...others)
   }
@@ -237,6 +250,58 @@ abstract class SchemaBuilder<
    * Typescript: `A | B`
    */
   union: typeof this.or = this.or
+
+  /** 
+   * Exclude given subschema.
+   * 
+   * Append `not` keyword for your schema
+   * 
+   * @see {@link not}
+   * @see {@link SchemaBuilder.not not method}
+   * @example
+   * cosnt res = s
+   *   .string<'Jerry' | 'Martin'>()
+   *   .exclude(s.const('Jerry'))
+   *   .schema // {type: "string", not: {const: "Jerry"} }
+   * type Res = s.infer<typeof res> // 'Martin'
+   */
+  exclude<
+    S extends AnySchemaBuilder = AnySchemaBuilder,
+    Excl = Exclude<this['_output'], S['_output']>,
+    This =
+    this extends StringSchemaBuilder<infer S> ? StringSchemaBuilder<Excl extends string ? Excl : S>
+    : this extends NumberSchemaBuilder<infer N> ? NumberSchemaBuilder<Excl extends number ? Excl : N>
+    : this extends BooleanSchemaBuilder<infer B> ? BooleanSchemaBuilder<Excl extends boolean ? Excl : B>
+    : this extends ArraySchemaBuilder<infer E> ? ArraySchemaBuilder<Exclude<E, S['_output']>>
+    : this extends ObjectSchemaBuilder<infer Def extends ObjectDefinition> ? ObjectSchemaBuilder<OmitByValue<Def, S>>
+    : this,
+  >(s: S): This {
+    (this.schema as AnySchema).not = s.schema
+    return this as never;
+  }
+
+  /**
+   * Exclude self schema.
+   * 
+   * Wrap your schema with `not` keyword
+   * 
+   * `s.not(s.string())` === `s.string().not()`
+   * 
+   * If you need to append `not` keyword instead of wrap you might need to use {@link SchemaBuilder.exclude `exclude`} method
+   * 
+   * @see {@link not}
+   * @see {@link SchemaBuilder.exclude exclude method}
+   * 
+   * @example
+   * // not string
+   * s
+   *   .string()
+   *   .not()
+   *   .schema //  {not: { type: "string" }},
+   */
+  not<S extends AnySchemaBuilder = this>(): NotSchemaBuilder<S> {
+    return not(this) as never
+  }
 
   /**
    * Parse you input result. Used `ajv.validate` under the hood
@@ -300,12 +365,22 @@ abstract class SchemaBuilder<
       }
     }
   }
-
+  /**
+   * Validate your schema.
+   * 
+   * @returns {boolean} Validity of your schema
+   */
   validate(input: unknown): input is Output {
     const { success } = this.safeParse(input)
     return success
   }
 
+  /**
+   * Parse input for given schema.
+   * 
+   * @returns {Output} parsed output result.
+   * @throws `Error` when input not match given schema
+   */
   parse(input: unknown): Output {
     const result = this.safeParse(input)
     if (!result.success) {
@@ -314,7 +389,7 @@ abstract class SchemaBuilder<
     return result.data
   }
 }
-class NumberSchemaBuilder<N extends number = number> extends SchemaBuilder<number, NumberSchema, N> {
+class NumberSchemaBuilder<const N extends number = number> extends SchemaBuilder<number, NumberSchema, N> {
   constructor() {
     super({ type: 'number' })
   }
@@ -329,6 +404,18 @@ class NumberSchemaBuilder<N extends number = number> extends SchemaBuilder<numbe
   number() {
     this.schema.type = 'number'
     return this
+  }
+
+  /** 
+   * The `const` keyword is used to restrict a value to a single value.
+   * @example
+   * const a = s.number().const(5)
+   * a.schema // {type: "number", const: 5}
+   * s.infer<typeof a> // 5
+   */
+  const<const N extends number>(value: N): NumberSchemaBuilder<N> {
+    this.schema.const = value
+    return this as never
   }
 
   /** Set schema `{type: 'integer'}` */
@@ -489,8 +576,8 @@ class NumberSchemaBuilder<N extends number = number> extends SchemaBuilder<numbe
  * test1.parse(1) // ok
  * test1.parse('qwe') // error
  */
-function number() {
-  return new NumberSchemaBuilder()
+function number<const N extends number = number>() {
+  return new NumberSchemaBuilder<N>()
 }
 
 /**
@@ -507,7 +594,7 @@ function integer() {
 class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder<string, StringSchema, S> {
 
   /**
-   * The `pattern` and `patternProperties` keywords use regular expressions to express constraints.
+   * The `pattern` use regular expressions to express constraints.
    * The regular expression syntax used is from JavaScript ({@link https://www.ecma-international.org/publications-and-standards/standards/ecma-262/ ECMA 262}, specifically).
    * However, that complete syntax is not widely supported, therefore it is recommended that you stick to the subset of that syntax described below.
    * 
@@ -720,8 +807,7 @@ function string<const S extends string = string>() {
   return new StringSchemaBuilder<S>()
 }
 
-class BooleanSchemaBuilder extends SchemaBuilder<boolean, BooleanSchema> {
-
+class BooleanSchemaBuilder<const B extends boolean = boolean> extends SchemaBuilder<B, BooleanSchema> {
   constructor() {
     super({ type: 'boolean' })
   }
@@ -1039,13 +1125,20 @@ function record<Def extends AnySchemaBuilder>(valueDef: Def) {
 }
 
 
-class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder<
+class ArraySchemaBuilder<
+  E = unknown,
+  T extends E[] = E[],
+  S extends SchemaBuilder<E> = SchemaBuilder<E>
+> extends SchemaBuilder<
   T,
-  ArraySchema
+  ArraySchema,
+  T
 > {
-
-  constructor(private definition: SchemaBuilder) {
-    super({ type: 'array', items: [definition.schema], minItems: 0 })
+  constructor(private definition?: S) {
+    super({ type: 'array', items: [], minItems: 0 })
+    if (definition) {
+      this.schema.items = definition.schema
+    }
   }
 
   /** Returns element schema */
@@ -1091,11 +1184,11 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
       ? L
       : [
         never,
-        'Type Error. Only Positive and non floating numbers are supported.',
+        'TypeError. "length" should be positive integer',
         `Received: '${L}'`,
       ],
   ) {
-    return this.minLength(value).maxLength(value)
+    return this.minLength(value as number).maxLength(value as number)
   }
   /**
    * Must contain more items or equal than declared
@@ -1113,7 +1206,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
       ? L
       : [
         never,
-        'Type Error. Only Positive and non floating numbers are supported.',
+        'TypeError. minLength should be positive integer.',
         `Received: '${L}'`,
       ],
   ) {
@@ -1129,7 +1222,7 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
    * same as `s.array().minLength(1)`
    * @see {@link ArraySchemaBuilder.minLength}
    */
-  nonEmpty(): ArraySchemaBuilder<E, [E, ...E[]]> {
+  nonEmpty(): ArraySchemaBuilder<E, [E, ...E[]], S> {
     return this.minLength(1) as never
   }
 
@@ -1147,9 +1240,13 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
   }
 
   /**
+   * `contains` schema only needs to validate against one or more items in the array.
    * 
-   * @param containItem 
-   * @returns 
+   * JSON Schema: `{type: 'array', contains: <json-schema>}`
+   * @example
+   * const arr = s.array().contains(s.number())
+   * arr.validate([]) // false, no numbers here
+   * arr.validate([true, 1, 'str']) // true
    */
   contains<S extends AnySchemaBuilder>(containItem: S): ArraySchemaBuilder<E | Infer<S>> {
     this.schema.contains = containItem.schema
@@ -1164,8 +1261,19 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
    * schema.parse(['qwe', 1,2,3]) // OK
    * schema.parse(['qwe', 1,2]) // Error, expect at least 3 numerics
    */
-  minContains(value: number) {
-    this.schema.minContains = value;
+  minContains<
+    const N extends number = number,
+    Valid = IsPositiveInteger<N>
+  >(
+    value: Valid extends true
+      ? N
+      : [
+        never,
+        'TypeError: "minContains" should be positive integer',
+        `Received: '${N}'`,
+      ]
+  ) {
+    this.schema.minContains = value as N;
     return this
   }
   /**
@@ -1177,16 +1285,29 @@ class ArraySchemaBuilder<E = unknown, T extends E[] = E[]> extends SchemaBuilder
    * schema.parse(['qwe', 1,2,3]) // OK
    * schema.parse(['qwe', 1,2,3, 4]) // Error, expect max 3 numbers
    */
-  maxContains(value: number) {
-    this.schema.maxContains = value;
+  maxContains<
+    const N extends number = number,
+    Valid = IsPositiveInteger<N>
+  >(
+    value: Valid extends true
+      ? N
+      : [
+        never,
+        'TypeError: "maxContains" should be positive integer',
+        `Received: '${N}'`
+      ]
+  ) {
+    this.schema.maxContains = value as N;
     return this
   }
 }
 
-function array<S extends SchemaBuilder = SchemaBuilder>(
-  definition: S,
+function array<
+  S extends SchemaBuilder = AnySchemaBuilder,
+>(
+  definition?: S,
 ) {
-  return new ArraySchemaBuilder<S['_output']>(definition)
+  return new ArraySchemaBuilder<S['_output'], S['_output'][], S>(definition)
 }
 
 type AssertArray<T> = T extends any[] ? T : never;
@@ -1300,7 +1421,13 @@ class ConstantSchemaBuilder<
     super({ const: value })
   }
 }
-
+/** 
+ * `const` is used to restrict a value to a single value.
+ * @example
+ * const constant = s.const("Hello World")
+ * constant.validate("Hello World") // true
+ * constant.validate("Hello World 1") // false
+ */
 function constant<T extends number | string | boolean | null | object>(
   value: T,
 ) {
@@ -1310,8 +1437,6 @@ function constant<T extends number | string | boolean | null | object>(
 class UnionSchemaBuilder<
   S extends SchemaBuilder[] = SchemaBuilder[],
 > extends SchemaBuilder<Infer<S[number]>, AnySchemaOrAnnotation> {
-
-
   constructor(...schemas: S) {
     super({
       anyOf: schemas.map((s) => s.schema),
@@ -1319,24 +1444,21 @@ class UnionSchemaBuilder<
   }
 }
 
-function or<S extends SchemaBuilder[] = SchemaBuilder[]>(schemaDefs: S): UnionSchemaBuilder<S>
-function or<S extends SchemaBuilder[] = SchemaBuilder[]>(...schemaDefs: S): UnionSchemaBuilder<S>
-function or<S extends SchemaBuilder[] = SchemaBuilder[]>(
-  ...schemaDefs: S
+function or<S extends AnySchemaBuilder[] = SchemaBuilder[]>(
+  ...defs: S
 ) {
-  return new UnionSchemaBuilder<S>(...schemaDefs)
+  return new UnionSchemaBuilder<S>(...defs)
 }
 
 class IntersectionSchemaBuilder<
-  S extends SchemaBuilder[] = SchemaBuilder[],
-  Elem = S[number],
-  Intersection extends SchemaBuilder = UnionToIntersection<Elem> extends SchemaBuilder ? UnionToIntersection<Elem> : SchemaBuilder
+  S extends AnySchemaBuilder[] = SchemaBuilder[],
+  Elem extends AnySchemaBuilder = S[number],
+  Intersection extends AnySchemaBuilder = UnionToIntersection<Elem> extends SchemaBuilder ? UnionToIntersection<Elem> : SchemaBuilder
 > extends SchemaBuilder<
-  Infer<Intersection>,
-  AnySchemaOrAnnotation
+  Infer<Elem>,
+  AnySchemaOrAnnotation,
+  Infer<Intersection>
 > {
-
-
   constructor(...schemas: S) {
     super({
       allOf: schemas.map((s) => s.schema),
@@ -1344,33 +1466,113 @@ class IntersectionSchemaBuilder<
   }
 }
 
-function and<S extends SchemaBuilder[] = SchemaBuilder[]>(defs: S): IntersectionSchemaBuilder<S>;
-function and<S extends SchemaBuilder[] = SchemaBuilder[]>(...defs: S): IntersectionSchemaBuilder<S>;
-function and<S extends SchemaBuilder[] = SchemaBuilder[]>(
-  ...schemaDefs: S
+function and<S extends AnySchemaBuilder[] = SchemaBuilder[]>(
+  ...defs: S
 ) {
-  return new IntersectionSchemaBuilder<S>(...schemaDefs)
+  return new IntersectionSchemaBuilder<S>(...defs)
 }
 
-class UnknownsSchemaBuilder<T extends unknown | any> extends SchemaBuilder<T, AnySchemaOrAnnotation>{
+type PropKey = Exclude<PropertyKey, symbol>
+
+/**
+ * Extract keys from given schema `s.object` and set as constant for output schema
+ * 
+ * TypeScript - `keyof T` type
+ * 
+ * JSON schema - `{anyOf: [{const: 'key1'}, {const: 'key2'}, ...] }`
+ * @throws `Error` if given schema doesn't have `properties` properties. Only non-empty `object` schema has `properties` properties.
+ */
+function keyof<
+  ObjSchema extends ObjectSchemaBuilder,
+  Res extends PropKey = keyof ObjSchema['_output'] extends PropKey ? keyof ObjSchema['_output'] : never
+>(obj: ObjSchema): UnionSchemaBuilder<ConstantSchemaBuilder<Res>[]> {
+  if (!obj.schema.properties) {
+    throw new Error(`cannot get keys from not an object. Got ${obj.schema.type}`, { cause: { schema: obj.schema, instance: obj } })
+  }
+  const schemas = Object.keys(obj.schema.properties).map(prop => constant(prop))
+  return or(...schemas) as never
+}
+
+class UnknownSchemaBuilder<T extends unknown | any> extends SchemaBuilder<T, AnySchemaOrAnnotation>{
   constructor() {
     super({} as AnySchemaOrAnnotation)
   }
 }
 
 /**
- * define all possible schema types for `anyOf` JSON schema
+ * TypeScript - `any` type
+ * 
+ * JSON schema - `{}` (empty object)
  */
 function any() {
-  return new UnknownsSchemaBuilder<any>()
+  return new UnknownSchemaBuilder<any>()
 }
 
 /**
- * Same as {@link any} but for typescript better type quality
+ * Same as {@link any} but for typescript better type quality.
+ * 
+ * TypeScript - `unknown` type
+ * 
+ * JSON schema - `{}` (empty object)
  */
 function unknown() {
-  return new UnknownsSchemaBuilder<unknown>()
+  return new UnknownSchemaBuilder<unknown>()
 }
+
+class NeverSchemaBuilder extends SchemaBuilder<never> {
+  constructor() {
+    super({ not: {} } as AnySchemaOrAnnotation)
+  }
+}
+/** 
+ * Typescript - `never` type.
+ * 
+ * JSON Schema - `{ not: {} }`
+ */
+function never() {
+  return new NeverSchemaBuilder()
+}
+
+class NotSchemaBuilder<
+  S extends AnySchemaBuilder = SchemaBuilder<any, any, any>,
+  T extends number | string | boolean | object | null | Array<unknown> = number | string | boolean | object | null | Array<unknown>,
+  Out = Exclude<T, S['_output']>
+> extends SchemaBuilder<
+  S['_output'],
+  AnySchemaOrAnnotation,
+  Out
+> {
+  constructor(schema: S) {
+    super({
+      not: schema.schema,
+    } as AnySchemaOrAnnotation)
+  }
+}
+
+/**
+ * The `not` declares that an instance validates if it doesn't validate against the given subschema.
+ * 
+ * **NOTE:** `s.not(s.string())` and `s.string().not()` is not the same!
+ * 
+ * JSON Schema: `{ not: <json schema> }`
+ * 
+ * @see {@link https://json-schema.org/understanding-json-schema/reference/combining#not json schema `not` keyword}
+ * @see {@link SchemaBuilder.not not method}
+ * @example
+ * import s from 'ajv-ts'
+ * 
+ * const notString = s.not(s.string())
+ * 
+ * notString.parse(42) // OK
+ * notString.parse({key: 'value'}) // OK
+ * notString.parse('I am a string') // throws
+ */
+function not<
+  S extends AnySchemaBuilder = AnySchemaBuilder,
+>(def: S) {
+  return new NotSchemaBuilder<S>(def)
+}
+
 
 function injectAjv<S extends SchemaBuilder = SchemaBuilder>(ajv: Ajv, schemaBuilderFn: (...args: any[]) => S): (...args: unknown[]) => S {
   return new Proxy(schemaBuilderFn, {
@@ -1382,14 +1584,17 @@ function injectAjv<S extends SchemaBuilder = SchemaBuilder>(ajv: Ajv, schemaBuil
   })
 }
 
-class AjvTsError extends Error {
-  constructor(readonly issues: ErrorObject[] = []) {
-    super()
-  }
-}
-
 /**
  * Create new instance of schema definition with non default AJV instance
+ * 
+ * @example
+ * import Ajv from 'ajv'
+ * import s from 'ajv-ts'
+ *
+ * const myAjv = new Ajv(/custom options/);
+ * const builder = s.create(myAjv)
+ *
+ * builder.number().parse(123) // OK, but use myAjv instance instead of default
  */
 function create(ajv: Ajv) {
   return {
@@ -1401,16 +1606,19 @@ function create(ajv: Ajv) {
     enum: injectAjv(ajv, makeEnum) as typeof makeEnum,
     boolean: injectAjv(ajv, boolean) as typeof boolean,
     object: injectAjv(ajv, object) as typeof object,
+    keyof: injectAjv(ajv, keyof) as typeof keyof,
     record: injectAjv(ajv, record) as typeof record,
     array: injectAjv(ajv, array) as typeof array,
     tuple: injectAjv(ajv, tuple) as typeof tuple,
     const: injectAjv(ajv, constant) as typeof constant,
     unknown: injectAjv(ajv, unknown) as typeof unknown,
     any: injectAjv(ajv, any) as typeof any,
+    never: injectAjv(ajv, never) as typeof never,
     or: injectAjv(ajv, or) as typeof or,
     union: injectAjv(ajv, or) as typeof or,
     and: injectAjv(ajv, and) as typeof and,
     intersection: injectAjv(ajv, and) as typeof and,
+    not: injectAjv(ajv, not) as typeof not,
   }
 }
 
@@ -1424,6 +1632,7 @@ export {
   boolean,
   nil as null,
   object,
+  keyof,
   record,
   array,
   tuple,
@@ -1435,6 +1644,8 @@ export {
   or as union,
   unknown,
   any,
+  never,
+  not,
   type Infer as infer,
   type Input as input,
   type AnySchemaBuilder as AnySchema,

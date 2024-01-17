@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test'
 import { s } from '../src'
 import { assertEqualType } from '../src/utils'
 
+const empty = s.array()
 const minTwo = s.array(s.string()).minLength(2);
 const maxTwo = s.array(s.string()).maxLength(2);
 const justTwo = s.array(s.string()).length(2);
@@ -33,10 +34,8 @@ test("passing validations", () => {
   nonEmptyMax.parse(["a"]);
 });
 
-
 test("get element", () => {
-  justTwo.element.schema;
-  expect(() => justTwo.element.parse(12)).toThrow();
+  expect(() => justTwo.element?.parse(12)).toThrow();
 });
 
 test("parse should fail given sparse array", () => {
