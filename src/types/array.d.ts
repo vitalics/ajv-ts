@@ -3,6 +3,7 @@ export type Create<
   T = unknown,
   U extends T[] = []
 > = U['length'] extends L ? U : Create<L, T, [T, ...U]>;
+
 /** Exclude Element from given array
  * @example
  * type Arr = [1,2,3]
@@ -17,3 +18,6 @@ export type ExcludeArr<Arr extends any[], El> = Exclude<Arr[number], El> extends
   : Arr;
 
 export type Length<T extends unknown[] = []> = T['length']
+
+export type Head<T> = T extends [infer First, ...unknown[]] ? First : never;
+export type Tail<T> = T extends [infer _, ...infer Rest] ? Rest : [];

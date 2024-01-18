@@ -33,6 +33,7 @@
     - [`.dependentRequired`](#dependentrequired)
     - [`.rest`](#rest)
   - [Arrays](#arrays)
+    - [`.addItems`](#additems)
     - [`.element`](#element)
     - [`.nonempty`](#nonempty)
     - [`.min`/`.max`/`.length`/`.minLength`/`.maxLength`](#minmaxlengthminlengthmaxlength)
@@ -320,6 +321,7 @@ type A = s.infer<typeof schema>; // string | undefined
 const nullableString = s.string().nullable();
 nullableString.parse("asdf"); // => "asdf"
 nullableString.parse(null); // => null
+nullableString.parse(undefined); // throws error
 ```
 
 ## Objects
@@ -613,6 +615,29 @@ Or it's invariant
 ```ts
 const stringArray = s.string().array();
 type StringArray = s.infer<typeof stringArray> // string[]
+```
+
+Or you can pass empty schema
+
+```ts
+const empty = s.array()
+
+type Empty = s.infer<typeof empty> // unknown[]
+```
+
+### `.addItems`
+
+push(append) schema to array(parent) schema.
+
+Example:
+
+```ts
+import s from 'ajv-ts'
+
+const empty = s.array()
+const stringArr = empty.addItems(s.string())
+
+stringArr.schema // {type: 'array', items: [{ type: 'string' }]}
 ```
 
 ### `.element`

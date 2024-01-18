@@ -122,3 +122,9 @@ test('exclude builder support', () => {
     b: s.string()
   }))['_output']
 })
+
+test('should throws for "undefined" value for nullable schema', () => {
+  const str = s.string().nullable()
+
+  expect(() => str.parse(undefined)).toThrow(Error)
+})

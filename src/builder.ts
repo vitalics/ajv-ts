@@ -7,7 +7,7 @@ import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, Ob
 import type { IsPositiveInteger } from './types/number'
 import type { Email } from './types/string'
 import type { OmitByValue, OmitMany } from './types/object'
-import { ExcludeArr } from './types/array'
+import { Create, Head, Tail } from './types/array'
 
 export const DEFAULT_AJV = ajvErrors(addFormats(new Ajv({ allErrors: true })))
 /** Any schema builder. */
@@ -25,7 +25,6 @@ type AnySchemaBuilder =
   | UnionSchemaBuilder
   | IntersectionSchemaBuilder
   | UnknownSchemaBuilder<unknown>
-  | UnknownSchemaBuilder<any>
   | NotSchemaBuilder
 
 type MetaObject = Pick<BaseSchema, 'title'> &
@@ -214,7 +213,7 @@ abstract class SchemaBuilder<
    * 
    * @see {@link array}
    */
-  array() {
+  array(): ArraySchemaBuilder<this[]> {
     return array(this)
   }
 
@@ -1126,24 +1125,27 @@ function record<Def extends AnySchemaBuilder>(valueDef: Def) {
 
 
 class ArraySchemaBuilder<
-  E = unknown,
-  T extends E[] = E[],
-  S extends SchemaBuilder<E> = SchemaBuilder<E>
+  S extends SchemaBuilder[] = SchemaBuilder[],
 > extends SchemaBuilder<
-  T,
-  ArraySchema,
-  T
+  InferArray<S>,
+  ArraySchema
 > {
-  constructor(private definition?: S) {
-    super({ type: 'array', items: [], minItems: 0 })
-    if (definition) {
-      this.schema.items = definition.schema
-    }
+  constructor(...definitions: S) {
+    super({ type: 'array', items: definitions?.map(def => def.schema) ?? [], minItems: 0 })
   }
 
-  /** Returns element schema */
-  get element() {
-    return this.definition
+  /** 
+   * Append subschema for current array schema
+   * @example
+   * import s from 'ajv-ts'
+   * const arr = s
+   *   .array(s.string())
+   *   .addItems(s.number(), s.boolean())
+   * arr.schema // {type: 'array', items: [{type: 'string'}, {type: 'number'}, {type: 'boolean'}] }
+   */
+  addItems<Schema extends SchemaBuilder, Schemas extends SchemaBuilder[] = Schema[]>(...s: Schemas): ArraySchemaBuilder<[...S, ...Schemas]> {
+    (this.schema.items! as AnySchemaOrAnnotation[]).push(...s.map(el => el.schema))
+    return this as never
   }
 
   max = this.maxLength
@@ -1157,7 +1159,7 @@ class ArraySchemaBuilder<
    * arr.parse([1]) // OK
    * arr.parse([1, 2, 3, 4]) // Error
    */
-  maxLength<L extends number, Valid = IsPositiveInteger<L>>(
+  maxLength<L extends number, Valid = IsPositiveInteger<L>, Arr extends SchemaBuilder[] = Create<L, S[number]>>(
     value: Valid extends true
       ? L
       : [
@@ -1165,9 +1167,9 @@ class ArraySchemaBuilder<
         'Type Error. Only Positive and non floating numbers are supported.',
         `Received: '${L}'`,
       ],
-  ) {
+  ): ArraySchemaBuilder<Arr> {
     this.schema.maxItems = value as L
-    return this
+    return this as never
   }
   /**
    * Must contain array length exactly. Same as `minLength(v).maxLength(v)`
@@ -1179,7 +1181,7 @@ class ArraySchemaBuilder<
    * arr.parse([1, 2, 3, 4, 5, 6]) // Error
    * arr.parse([1, 2, 3, 4]) // Error
    */
-  length<L extends number, Valid = IsPositiveInteger<L>>(
+  length<L extends number, Valid = IsPositiveInteger<L>, Arr extends SchemaBuilder[] = Create<L, S[number]>>(
     value: Valid extends true
       ? L
       : [
@@ -1187,8 +1189,8 @@ class ArraySchemaBuilder<
         'TypeError. "length" should be positive integer',
         `Received: '${L}'`,
       ],
-  ) {
-    return this.minLength(value as number).maxLength(value as number)
+  ): ArraySchemaBuilder<Arr> {
+    return this.minLength(value as number).maxLength(value as number) as never
   }
   /**
    * Must contain more items or equal than declared
@@ -1198,10 +1200,10 @@ class ArraySchemaBuilder<
    * @example
    * const arr = s.array(s.number()).minLength(3)
    * arr.parse([1, 2, 3]) // OK
-   * arr.parse([1]) // Err
+   * arr.parse([1]) // Error
    * arr.parse([1, 2, 3, 4]) // OK
    */
-  minLength<L extends number, Valid = IsPositiveInteger<L>>(
+  minLength<const L extends number, Valid = IsPositiveInteger<L>, Arr extends SchemaBuilder[] = Create<L, S[number]>>(
     value: Valid extends true
       ? L
       : [
@@ -1209,12 +1211,12 @@ class ArraySchemaBuilder<
         'TypeError. minLength should be positive integer.',
         `Received: '${L}'`,
       ],
-  ) {
+  ): ArraySchemaBuilder<[...Arr, ...Arr[number][]]> {
     if ((value as L) < 0) {
       throw new TypeError(`Only Positive and non floating numbers are supported.`)
     }
     this.schema.minItems = value as L
-    return this
+    return this as never
   }
   min = this.minLength
 
@@ -1222,7 +1224,11 @@ class ArraySchemaBuilder<
    * same as `s.array().minLength(1)`
    * @see {@link ArraySchemaBuilder.minLength}
    */
-  nonEmpty(): ArraySchemaBuilder<E, [E, ...E[]], S> {
+  nonEmpty<
+    H extends SchemaBuilder = Head<S> extends SchemaBuilder ? Head<S> : never,
+    EmptyTail = Tail<S> extends [] ? true : false,
+    T extends SchemaBuilder[] = EmptyTail extends true ? H[] : Tail<S>
+  >(): ArraySchemaBuilder<[H, ...T]> {
     return this.minLength(1) as never
   }
 
@@ -1248,7 +1254,7 @@ class ArraySchemaBuilder<
    * arr.validate([]) // false, no numbers here
    * arr.validate([true, 1, 'str']) // true
    */
-  contains<S extends AnySchemaBuilder>(containItem: S): ArraySchemaBuilder<E | Infer<S>> {
+  contains<S extends AnySchemaBuilder>(containItem: S) {
     this.schema.contains = containItem.schema
     return this
   }
@@ -1302,12 +1308,18 @@ class ArraySchemaBuilder<
   }
 }
 
+/**
+ * Define schema for array of elements. Accept array of subschemas.
+ * @example
+ * import s from 'ajv-ts'
+ * 
+ * const tuple = s.array(s.string(), s.number())
+ * tuple.schema // {type: 'array', items: [{type: 'string'}, {type: 'number'}] }
+ */
 function array<
-  S extends SchemaBuilder = AnySchemaBuilder,
->(
-  definition?: S,
-) {
-  return new ArraySchemaBuilder<S['_output'], S['_output'][], S>(definition)
+  S extends SchemaBuilder[] = AnySchemaBuilder[],
+>(...definitions: S) {
+  return new ArraySchemaBuilder(...definitions)
 }
 
 type AssertArray<T> = T extends any[] ? T : never;
@@ -1327,11 +1339,12 @@ class TupleSchemaBuilder<
   Schemas extends TupleItems | [] = TupleItems,
 > extends SchemaBuilder<OutputTypeOfTupleWithRest<Schemas>, ArraySchema> {
   constructor(...defs: Schemas) {
-    super({ type: 'array', items: defs.map(def => def.schema), additionalItems: false, minItems: 1 })
+    super({ type: 'array', prefixItems: defs.map(def => def.schema), additionalItems: false })
   }
-  rest<Def extends SchemaBuilder>(def: Def): SchemaBuilder<OutputTypeOfTupleWithRest<Schemas>, ArraySchema, [...OutputTypeOfTupleWithRest<Schemas>, ...Infer<Def>[]]> {
-    this.schema.items = def.schema
-    return this as never
+  /** set `unevaluatedItems` to `false`. That means that all properties should be evaluated */
+  required() {
+    this.schema.unevaluatedItems = false
+    return this;
   }
 }
 
@@ -1655,5 +1668,14 @@ export {
  * Extract schema level defenition and return it's represenation as typescript type
  */
 export type Infer<T extends SchemaBuilder<any, any, any>> = T['_output']
+
+/** Extract SchemaBuilder[] - used in array schema to build right types */
+type InferArray<T extends SchemaBuilder[], Result extends unknown[] = []> =
+  T extends [] ? unknown[] :
+  T extends [infer First extends SchemaBuilder, ...infer Rest extends SchemaBuilder[]] ?
+  Rest extends [] ? [...Result, Infer<First>] : InferArray<Rest, [...Result, Infer<First>]>
+  : T extends Array<infer El extends SchemaBuilder> ? [...Result, ...Infer<El>[]]
+  : Result
+
 /** extract schema input type */
 export type Input<T extends SchemaBuilder<any, any, any>> = T['_input']

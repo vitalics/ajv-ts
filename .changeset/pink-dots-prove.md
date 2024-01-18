@@ -2,13 +2,22 @@
 "ajv-ts": minor
 ---
 
-Minor release `0.5` is Out!
+Minor release `0.5` is out!
+
+## Installation/Update
+
+```bash
+npm i ajv-ts@latest # npm
+yarn add ajv-ts@latest # yarn
+pnpm add ajv-ts@latest # pnpm
+bun add ajv-ts@latest # bun
+```
 
 ## New Features
 
 ### not, exclude
 
-Now you can mark your schema with `not` keyword.
+Now you can mark your schema with `not` keyword!
 
 Here is a 2 differences between `not` and `exclude`.
 
@@ -42,18 +51,21 @@ s.infer<typeof str> // 'Mary'
 
 New function that can be used in a root. Same as `keyof T` in Typescript.
 
+**NOTE:** currenty works only with objects only, this behavior will be fixed in future releases.
+
 Example:
 
 ```ts
 import s from 'ajv-ts'
 
-const schema = s.keyof(s.object({
+const keys = s.keyof(s.object({
   key1: s.string(),
   key2: s.object({})
 }))
 
-type Result = s.infer<typeof schema> // 'key1' | 'key2'
+type Result = s.infer<typeof keys> // 'key1' | 'key2'
 
+keys.schema // { anyOf: [ { cosnt: 'key1' }, {const: 'key2' } ] }
 ```
 
 ### Never
@@ -67,7 +79,7 @@ Same as `never` type in Typescript. JSON-schema equivalent is `{not: {}}`.
 
 ### Array
 
-#### Optional schema definition
+#### empty schema definition
 
 function can be called without schema definition
 
@@ -78,6 +90,21 @@ s.array() // error
 
 // 0.5 and later
 s.array() // OK, deinition is not required anymore!
+```
+
+### pushItems
+
+push(append) schema to array(parent) schema.
+
+Example:
+
+```ts
+import s from 'ajv-ts'
+
+const empty = s.array()
+const stringArr = empty.addItems(s.string())
+
+stringArr.schema // {type: 'array', items: [{ type: 'string' }]}
 ```
 
 #### minContains/maxContains
