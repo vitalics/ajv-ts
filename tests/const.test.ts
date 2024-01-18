@@ -1,4 +1,3 @@
-// @ts-ignore TS6133
 import { expect, test } from "@jest/globals";
 
 import * as s from "../src";
@@ -6,7 +5,6 @@ import * as s from "../src";
 const constTuna = s.const("tuna");
 const constFortyTwo = s.const(42);
 const constTrue = s.const(true);
-
 
 test("passing validations", () => {
   constTuna.parse("tuna");

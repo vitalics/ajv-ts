@@ -3,16 +3,25 @@ import { expect, test } from 'bun:test'
 import { s } from '../src'
 import { assertEqualType } from '../src/utils'
 
+const empty = s.array()
 const minTwo = s.array(s.string()).minLength(2);
 const maxTwo = s.array(s.string()).maxLength(2);
 const justTwo = s.array(s.string()).length(2);
 const intNum = s.array(s.string()).nonEmpty();
 const nonEmptyMax = s.array(s.string()).nonEmpty().maxLength(2);
+const nonEmpty = s.array(s.string()).nonEmpty();
+
+type t0 = s.infer<typeof empty>
+assertEqualType<unknown[], t0>(true)
+
 type t1 = s.infer<typeof nonEmptyMax>;
-assertEqualType<[string, ...string[]], t1>(true);
+assertEqualType<[string, string], t1>(true);
 
 type t2 = s.infer<typeof minTwo>;
-assertEqualType<string[], t2>(true);
+assertEqualType<[string, string, ...string[]], t2>(true);
+
+type t3 = s.infer<typeof nonEmpty>
+assertEqualType<[string, ...string[]], t3>(true);
 
 test("passing validations", () => {
   expect(minTwo.schema).toMatchObject({
@@ -31,12 +40,6 @@ test("passing validations", () => {
   justTwo.parse(["a", "a"]);
   intNum.parse(["a"]);
   nonEmptyMax.parse(["a"]);
-});
-
-
-test("get element", () => {
-  justTwo.element.schema;
-  expect(() => justTwo.element.parse(12)).toThrow();
 });
 
 test("parse should fail given sparse array", () => {
@@ -59,4 +62,16 @@ test('invariant for array schema', () => {
 
   assertEqualType<Str, string[]>(true)
   assertEqualType<Obj, { qwe?: string, num: number }[]>(true)
+})
+
+test('addItems should append the schema for array', () => {
+  const str = empty.addItems(s.string())
+  expect(str.schema).toMatchObject({
+    type: 'array',
+    minItems: 0,
+    items: [{
+      type: 'string'
+    }]
+  })
+
 })
