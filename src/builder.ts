@@ -211,7 +211,6 @@ abstract class SchemaBuilder<
   /** 
    * set `$async=true` for your current schema.
    * 
-   * **Note:**
    * @see {@link https://ajv.js.org/guide/async-validation.html ajv async validation}
    */
   async() {
