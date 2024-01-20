@@ -215,7 +215,7 @@ abstract class SchemaBuilder<
    * @see {@link https://ajv.js.org/guide/async-validation.html ajv async validation}
    */
   async() {
-    (this.schema as AnySchema).$async = true;
+    (this.schema as Record<string, unknown>).$async = true;
     return this;
   }
 
