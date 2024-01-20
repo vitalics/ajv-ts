@@ -128,3 +128,44 @@ test('should throws for "undefined" value for nullable schema', () => {
 
   expect(() => str.parse(undefined)).toThrow(Error)
 })
+
+test('async schema', () => {
+  const Schema = s.object({
+    name: s.string()
+  }).async()
+
+  const a = Schema.parse({ name: 'hello' })
+  expect(Schema.schema).toMatchObject({
+    type: 'object',
+    $async: true,
+    properties: {
+      name: { type: 'string' }
+    }
+  })
+
+  expect(a.name).toBe('hello')
+})
+
+test('make sync schema', () => {
+  const async = s.object({}).async()
+
+  expect(async.schema).toMatchObject({
+    $async: true,
+    type: 'object',
+    properties: {},
+  })
+  const sync = async.sync()
+
+  expect(sync.schema).toMatchObject({
+    type: 'object',
+    $async: false,
+    properties: {},
+  })
+
+
+  const syncRemoved = sync.sync(true)
+  expect(syncRemoved.schema).toMatchObject({
+    type: 'object',
+    properties: {},
+  })
+})

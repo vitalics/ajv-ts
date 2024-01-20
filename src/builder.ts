@@ -208,6 +208,29 @@ abstract class SchemaBuilder<
     return this
   }
 
+  /** 
+   * set `$async=true` for your current schema.
+   * 
+   * **Note:**
+   * @see {@link https://ajv.js.org/guide/async-validation.html ajv async validation}
+   */
+  async() {
+    (this.schema as AnySchema).$async = true;
+    return this;
+  }
+
+  /**
+   * set `$async=false` for your current schema.
+   * @param [remove=true] applies `delete` operator for `schema.$async` property.
+   */
+  sync(remove = false) {
+    (this.schema as AnySchema).$async = false;
+    if (remove) {
+      delete (this.schema as AnySchema).$async
+    }
+    return this;
+  }
+
   /**
    * Construct Array schema. Same as `s.array(s.number())`
    * 
@@ -839,7 +862,6 @@ class ObjectSchemaBuilder<
     super({
       type: 'object',
       properties: {},
-      required: [],
     })
     Object.entries(def).forEach(([key, d]) => {
       this.schema.properties![key] = d.schema
@@ -889,7 +911,7 @@ class ObjectSchemaBuilder<
   partialFor<Key extends keyof T = keyof T>(
     key: Key,
   ): ObjectSchemaBuilder<Definition, ObjectTypes.OptionalByKey<T, Key>> {
-    const required = this.schema.required as string[]
+    const required = this.schema.required ?? [] as string[]
     const findedIndex = required.indexOf(key as string)
     // remove element from array. e.g. "email" for ['name', 'email'] => ['name']
     // opposite of push
@@ -961,7 +983,7 @@ class ObjectSchemaBuilder<
     ...keys: Key[]
   ): ObjectSchemaBuilder<Definition, ObjectTypes.RequiredByKeys<T, (typeof keys)[number]>> {
     this.schema.required = [
-      ...new Set([...this.schema.required!, ...keys as string[]]),
+      ...new Set([...(this.schema.required ?? []), ...keys as string[]]),
     ]
     return this as never
   }
@@ -975,7 +997,7 @@ class ObjectSchemaBuilder<
     const allProperties = Object.keys(this.schema.properties!)
     // keep unique only
     this.schema.required = [
-      ...new Set([...this.schema.required!, ...allProperties]),
+      ...new Set([...(this.schema.required ?? []), ...allProperties]),
     ]
     return this as never
   }
@@ -1020,6 +1042,9 @@ class ObjectSchemaBuilder<
    * type C = s.infer<typeof c> // {num: number; str: string}
    */
   extend<ObjDef extends ObjectDefinition = ObjectDefinition>(def: ObjDef): ObjectSchemaBuilder<Merge<Definition, ObjDef>> {
+    if (!this.schema.properties || typeof this.schema.properties !== 'object') {
+      this.schema.properties = {};
+    }
     Object.entries(def).forEach(([key, def]) => {
       this.schema.properties![key] = def.schema
     })
