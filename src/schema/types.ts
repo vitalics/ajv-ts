@@ -11,6 +11,7 @@ export type BaseSchema = SchemaObject & {
   not?: AnySchemaOrAnnotation
   type?: string
   $ref?: string
+  $async?: boolean;
   /**
    * ## New in draft 7
    * The `$comment` keyword is strictly intended for adding comments to a schema.

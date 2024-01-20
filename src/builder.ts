@@ -27,10 +27,13 @@ type AnySchemaBuilder =
   | UnknownSchemaBuilder<unknown>
   | NotSchemaBuilder
 
-type MetaObject = Pick<BaseSchema, 'title'> &
-  Pick<BaseSchema, 'description'> &
-  Pick<BaseSchema, 'deprecated'> &
-  Pick<BaseSchema, '$id'>
+type MetaObject =
+  & Pick<BaseSchema, 'title'>
+  & Pick<BaseSchema, 'description'>
+  & Pick<BaseSchema, 'deprecated'>
+  & Pick<BaseSchema, '$id'>
+  & Pick<BaseSchema, '$async'>
+  & Pick<BaseSchema, '$ref'>
 
 export type SafeParseResult<T> = SafeParseSuccessResult<T> | SafeParseErrorResult
 
@@ -187,6 +190,12 @@ abstract class SchemaBuilder<
       if (obj.$id) {
         this.schema.$id = obj.$id
       }
+      if (obj.$ref) {
+        this.schema.$ref = obj.$ref
+      }
+      if (obj.$async) {
+        this.schema.$async = obj.$async
+      }
     }
     return this
   }
@@ -206,6 +215,28 @@ abstract class SchemaBuilder<
   error(message: string) {
     (this.schema as AnySchema).errorMessage = message
     return this
+  }
+
+  /** 
+   * set `$async=true` for your current schema.
+   * 
+   * @see {@link https://ajv.js.org/guide/async-validation.html ajv async validation}
+   */
+  async() {
+    (this.schema as Record<string, unknown>).$async = true;
+    return this;
+  }
+
+  /**
+   * set `$async=false` for your current schema.
+   * @param [remove=false] applies `delete` operator for `schema.$async` property.
+   */
+  sync(remove: boolean = false) {
+    (this.schema as AnySchema).$async = false;
+    if (remove) {
+      delete (this.schema as AnySchema).$async
+    }
+    return this;
   }
 
   /**
@@ -839,7 +870,6 @@ class ObjectSchemaBuilder<
     super({
       type: 'object',
       properties: {},
-      required: [],
     })
     Object.entries(def).forEach(([key, d]) => {
       this.schema.properties![key] = d.schema
@@ -889,7 +919,7 @@ class ObjectSchemaBuilder<
   partialFor<Key extends keyof T = keyof T>(
     key: Key,
   ): ObjectSchemaBuilder<Definition, ObjectTypes.OptionalByKey<T, Key>> {
-    const required = this.schema.required as string[]
+    const required = this.schema.required ?? [] as string[]
     const findedIndex = required.indexOf(key as string)
     // remove element from array. e.g. "email" for ['name', 'email'] => ['name']
     // opposite of push
@@ -961,7 +991,7 @@ class ObjectSchemaBuilder<
     ...keys: Key[]
   ): ObjectSchemaBuilder<Definition, ObjectTypes.RequiredByKeys<T, (typeof keys)[number]>> {
     this.schema.required = [
-      ...new Set([...this.schema.required!, ...keys as string[]]),
+      ...new Set([...(this.schema.required ?? []), ...keys as string[]]),
     ]
     return this as never
   }
@@ -975,7 +1005,7 @@ class ObjectSchemaBuilder<
     const allProperties = Object.keys(this.schema.properties!)
     // keep unique only
     this.schema.required = [
-      ...new Set([...this.schema.required!, ...allProperties]),
+      ...new Set([...(this.schema.required ?? []), ...allProperties]),
     ]
     return this as never
   }
@@ -1020,6 +1050,9 @@ class ObjectSchemaBuilder<
    * type C = s.infer<typeof c> // {num: number; str: string}
    */
   extend<ObjDef extends ObjectDefinition = ObjectDefinition>(def: ObjDef): ObjectSchemaBuilder<Merge<Definition, ObjDef>> {
+    if (!this.schema.properties || typeof this.schema.properties !== 'object') {
+      this.schema.properties = {};
+    }
     Object.entries(def).forEach(([key, def]) => {
       this.schema.properties![key] = def.schema
     })
