@@ -27,10 +27,13 @@ type AnySchemaBuilder =
   | UnknownSchemaBuilder<unknown>
   | NotSchemaBuilder
 
-type MetaObject = Pick<BaseSchema, 'title'> &
-  Pick<BaseSchema, 'description'> &
-  Pick<BaseSchema, 'deprecated'> &
-  Pick<BaseSchema, '$id'>
+type MetaObject =
+  & Pick<BaseSchema, 'title'>
+  & Pick<BaseSchema, 'description'>
+  & Pick<BaseSchema, 'deprecated'>
+  & Pick<BaseSchema, '$id'>
+  & Pick<BaseSchema, '$async'>
+  & Pick<BaseSchema, '$ref'>
 
 export type SafeParseResult<T> = SafeParseSuccessResult<T> | SafeParseErrorResult
 
@@ -186,6 +189,12 @@ abstract class SchemaBuilder<
       }
       if (obj.$id) {
         this.schema.$id = obj.$id
+      }
+      if (obj.$ref) {
+        this.schema.$ref = obj.$ref
+      }
+      if (obj.$async) {
+        this.schema.$async = obj.$async
       }
     }
     return this
