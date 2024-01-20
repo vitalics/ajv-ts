@@ -221,9 +221,9 @@ abstract class SchemaBuilder<
 
   /**
    * set `$async=false` for your current schema.
-   * @param [remove=true] applies `delete` operator for `schema.$async` property.
+   * @param [remove=false] applies `delete` operator for `schema.$async` property.
    */
-  sync(remove = false) {
+  sync(remove: boolean = false) {
     (this.schema as AnySchema).$async = false;
     if (remove) {
       delete (this.schema as AnySchema).$async
