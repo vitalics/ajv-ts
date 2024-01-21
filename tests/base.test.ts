@@ -181,3 +181,35 @@ test('make sync schema', () => {
     properties: {},
   })
 })
+
+test('refine should throws custom error', () => {
+  const Schema = s.object({
+    active: s.boolean(),
+    name: s.string()
+  }).array().refine((arr) => {
+    const subArr = arr.filter(el => el.active === true)
+    if (subArr.length > 1) throw new Error('Array should contains only 1 "active" element')
+  })
+
+  const result = Schema.safeParse([{ active: true, name: 'some 1' }, { active: true, name: 'some 2' }])
+
+  expect(result.success).toBeFalse()
+  expect(result.error).toBeInstanceOf(Error)
+  expect(result.error?.message).toBe('Array should contains only 1 "active" element')
+})
+
+test('refine should throws default error', () => {
+  const Schema = s.object({
+    active: s.boolean(),
+    name: s.string()
+  }).array().refine((arr) => {
+    const subArr = arr.filter(el => el.active === true)
+    if (subArr.length > 1) return new Error('Array should contains only 1 "active" element')
+  })
+
+  const result = Schema.safeParse([{ active: true, name: 'some 1' }, { active: true, name: 'some 2' }])
+
+  expect(result.success).toBeFalse()
+  expect(result.error).toBeInstanceOf(Error)
+  expect(result.error?.message).toBe('refine error')
+})

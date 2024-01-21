@@ -178,6 +178,27 @@ abstract class SchemaBuilder<
     return this as never
   }
 
+  private refineFns: Function[] = []
+  /**
+   * Set custom validation. Any result exept `undefined` will throws.
+   * @param fn function that will be called after `safeParse`. Any result will throws
+   * @example
+   * import s from 'ajv-ts'
+   * // example: object with only 1 "active element"
+   * const Schema = s.object({
+   * active: s.boolean(),
+   * name: s.string()
+   * }).array().refine((arr) => {
+   *  const subArr = arr.filter(el => el.active === true)
+   *  if (subArr.length > 1) throw new Error('Array should contains only 1 "active" element')
+   * })
+   * 
+   * Schema.parse([{ active: true, name: 'some 1' }, { active: true, name: 'some 2' }]) // throws Error
+   */
+  refine(fn: (output: Output) => any) {
+    this.refineFns.push(fn)
+    return this
+  }
 
   /**
    * Meta object. Add additional fields in your schema
@@ -383,7 +404,16 @@ abstract class SchemaBuilder<
       if (!valid) {
         const firstError = this.ajv.errors?.at(0)
         return {
-          error: new Error(firstError?.message, { cause: firstError }),
+          error: new Error(firstError?.message, {
+            cause: {
+              error: firstError,
+              debug: {
+                input,
+                errors: this.ajv.errors,
+                schema: this.schema,
+              },
+            },
+          }),
           success: false,
           input: input
         }
@@ -422,6 +452,39 @@ abstract class SchemaBuilder<
     }
 
     const postTransformedResult = this._transform<Output>(parseResult.data, this.postFns)
+    if (!postTransformedResult.success) {
+      return postTransformedResult
+    }
+    if (this.refineFns && Array.isArray(this.refineFns) && this.refineFns.length > 0) {
+      for (const refine of this.refineFns) {
+        try {
+          const res = refine(postTransformedResult.data)
+          if (res !== undefined) {
+            return {
+              success: false,
+              error: new Error(`refine error`, {
+                cause: {
+                  refine: res,
+                  debug: {
+                    input,
+                    preTransformedResult,
+                    parseResult,
+                    postTransformedResult,
+                  }
+                }
+              }),
+              input: postTransformedResult.data,
+            }
+          }
+        } catch (e) {
+          return {
+            success: false,
+            error: e as Error,
+            input: postTransformedResult.data,
+          }
+        }
+      }
+    }
     return postTransformedResult
   }
   /**
