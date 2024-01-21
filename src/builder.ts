@@ -107,7 +107,7 @@ abstract class SchemaBuilder<
   /**
    * Marks your property as nullable (`undefined`)
    * 
-   * **NOTES**: since in json-schema no difference between null and undefined - it's just for TS types
+   * **NOTES**: json-schema not accept `undefined` type. It's just `nullable` as typescript `undefined` type.
    */
   optional(): SchemaBuilder<Input, Schema, Output | undefined> {
     return this.nullable() as never
@@ -116,7 +116,7 @@ abstract class SchemaBuilder<
   /**
    * Marks your property as nullable (`null`).
    * 
-   * Update `type` property for your schema.
+   * Updates `type` property for your schema.
    * @example
    * const schemaDef = s.string().nullable()
    * schemaDef.schema // { type: ['string', 'null'], nullable: true }
@@ -136,9 +136,12 @@ abstract class SchemaBuilder<
   private preFns: Function[] = []
 
   /**
-   * Add preprocess function for incoming result.
+   * pre process function for incoming result. Transform input **BEFORE** calling `parse`, `safeParse`, `validate` functions
    * 
    * **NOTE:** this functions works BEFORE parsing. use it at own risk. (e.g. transform Date object into string)
+   * @see {@link SchemaBuilder.parse parse method}
+   * @see {@link SchemaBuilder.safeParse safe parse method}
+   * @see {@link SchemaBuilder.validate validate method}
    * @example
    * const myString = s.string().preprocess(v => {
    *   // if date => transform to ISO string
@@ -162,7 +165,10 @@ abstract class SchemaBuilder<
 
   private postFns: { fn: Function, schema: AnySchemaBuilder }[] = []
   /**
-   * Post process. Use it when you would like to transform result after parsing is happens
+   * Post process. Use it when you would like to transform result after parsing is happens.
+   * 
+   * **NOTE:** this function override your `input` variable for `safeParse` calling.
+   * @see {@link SchemaBuilder.safeParse safeParse method}
    */
   postprocess<S extends AnySchemaBuilder = AnySchemaBuilder>(fn: (input: Input) => unknown, schema: S): S {
     if (typeof fn !== 'function') {
@@ -333,6 +339,63 @@ abstract class SchemaBuilder<
     return not(this) as never
   }
 
+  private _transform<Out = unknown>(input: unknown, arr: ({ fn: Function, schema: AnySchemaBuilder } | Function)[] = []): SafeParseResult<Out> {
+    let output;
+    if (Array.isArray(arr) && arr.length > 0) {
+      try {
+        output = arr.reduce((prevResult, el) => {
+          if (!prevResult.success) {
+            throw prevResult.error
+          }
+          let fnTransform
+          let result: SafeParseResult<unknown> = { data: input, input, success: true }
+          if (typeof el === 'function') {
+            fnTransform = el(prevResult.data)
+            result.data = fnTransform
+          } else {
+            fnTransform = el.fn(prevResult.data)
+            result = el.schema.safeParse(fnTransform)
+          }
+          return result
+        }, { input, data: input, success: true } as SafeParseResult<unknown>)
+      } catch (e) {
+        return {
+          success: false,
+          error: new Error((e as Error).message, { cause: e }),
+          input,
+        }
+      }
+      return output as SafeParseResult<Out>
+    }
+    output = input
+    return { data: output as Out, input, success: true }
+  }
+
+  private _safeParseRaw(input: unknown): SafeParseResult<unknown> {
+    try {
+      const valid: boolean = this.ajv.validate(this.schema, input)
+      if (!valid) {
+        const firstError = this.ajv.errors?.at(0)
+        return {
+          error: new Error(firstError?.message, { cause: firstError }),
+          success: false,
+          input: input
+        }
+      }
+    } catch (e) {
+      return {
+        error: new Error((e as Error).message, { cause: e }),
+        success: false,
+        input,
+      }
+    }
+    return {
+      input,
+      data: input,
+      success: true
+    }
+  }
+
   /**
    * Parse you input result. Used `ajv.validate` under the hood
    * 
@@ -341,59 +404,19 @@ abstract class SchemaBuilder<
   safeParse(input: unknown): SafeParseResult<Output> {
     // need to remove schema, or we get precompiled result. It's bad for `extend` and `merge` in object schema
     this.ajv.removeSchema(this.schema)
-    let transformed;
-    if (Array.isArray(this.preFns) && this.preFns.length > 0) {
-      try {
-        transformed = this.preFns.reduce((prevResult, fn) => {
-          return fn(prevResult)
-        }, input)
-      } catch (e) {
-        return {
-          success: false,
-          error: new Error((e as Error).message, { cause: e }),
-          input,
-        }
-      }
-    } else {
-      transformed = input
+    let preTransformedResult = this._transform(input, this.preFns);
+
+    if (!preTransformedResult.success) {
+      return preTransformedResult
     }
 
-    try {
-      const valid: boolean = this.ajv.validate(this.schema, transformed)
-      if (!valid) {
-        const firstError = this.ajv.errors?.at(0)
-        return {
-          error: new Error(firstError?.message, { cause: firstError }),
-          success: false,
-          input: transformed
-        }
-      }
-      if (Array.isArray(this.postFns) && this.postFns.length > 0) {
-        const output = this.postFns.reduce((prevResult, { fn, schema }) => {
-          const result = schema.safeParse(fn(prevResult))
-          if (result.success) {
-            return result.data
-          }
-          throw result.error
-        }, transformed)
-        return {
-          success: true,
-          data: output as Output,
-          input: transformed
-        }
-      }
-      return {
-        success: true,
-        data: transformed as Output,
-        input: transformed
-      }
-    } catch (e) {
-      return {
-        error: new Error((e as Error).message, { cause: e }),
-        success: false,
-        input: transformed
-      }
+    const parseResult = this._safeParseRaw(preTransformedResult.data)
+    if (!parseResult.success) {
+      return parseResult
     }
+
+    const postTransformedResult = this._transform<Output>(parseResult.data, this.postFns)
+    return postTransformedResult
   }
   /**
    * Validate your schema.

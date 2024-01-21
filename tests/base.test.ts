@@ -33,9 +33,21 @@ test('should support AJV custom ajv instance', () => {
 test('postProcess should should transform output result', () => {
   const myNum = s.number().postprocess(v => String(v), s.string())
 
-  expect(myNum.parse(1)).toBe('1')
+  const res = myNum.parse(1)
+
+  expect(res).toBe('1')
 })
 
+test('preprocess should transform input result', () => {
+  const envParsingSchema = s.boolean().preprocess(x => String(x) === 'true' || String(x) === '1')
+
+  expect(envParsingSchema.parse('true')).toBe(true)
+})
+
+test('preprocess should throw for unconsistant schema', () => {
+  const numberSchema = s.number().preprocess(x => String(x))
+  expect(() => numberSchema.parse('hello')).toThrow(Error)
+})
 
 test("test this binding", () => {
   const callback = (predicate: (val: string) => boolean) => {
