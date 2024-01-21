@@ -52,6 +52,9 @@
   - [Transformations](#transformations)
     - [Preprocess](#preprocess)
     - [Postprocess](#postprocess)
+  - [Error handling](#error-handling)
+    - [error](#error)
+    - [refine](#refine)
 
 JSON schema builder like in ZOD-like API
 
@@ -63,6 +66,7 @@ Reasons to install `ajv-ts` instead of `zod`
 2. not JSON-schema compatibility out of box (but you can install some additional plugins)
 3. we not use own parser, just `ajv`, which wild spreadable(90M week installations for `ajv` vs 5M for `zod`)
 4. Same typescript types and API
+5. You can inject own `ajv` instance!
 
 We inspired API from `zod`. So you just can reimport you api and that's it!
 
@@ -867,4 +871,30 @@ const ToString = s.number().postprocess(x => String(x), s.string())
 ToString.parse(12) // after parse we get "12" 12 => "12". 
 
 ToString.parse({}) // error: expects number. Postprocess has not been called
+```
+
+## Error handling
+
+### error
+
+Defines custom error message for any error. Error message from [`ajv-error`](https://ajv.js.org/packages/ajv-errors.html) package
+
+Set `schema.errorMessage = message`.
+
+### refine
+
+Inspired from `zod`. Set custom validation. Any result exept `undefined` will throws(or exposed for `safeParse` method).
+
+```ts
+import s from 'ajv-ts'
+// example: object with only 1 "active element"
+const Schema = s.object({
+active: s.boolean(),
+name: s.string()
+}).array().refine((arr) => {
+  const subArr = arr.filter(el => el.active === true)
+  if (subArr.length > 1) throw new Error('Array should contains only 1 "active" element')
+})
+
+Schema.parse([{ active: true, name: 'some 1' }, { active: true, name: 'some 2' }]) // throws Error
 ```
