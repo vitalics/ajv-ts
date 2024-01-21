@@ -213,3 +213,8 @@ test('refine should throws default error', () => {
   expect(result.error).toBeInstanceOf(Error)
   expect(result.error?.message).toBe('refine error')
 })
+
+test('refine should throws TypeError for not a function', () => {
+  // @ts-expect-error
+  expect(() => s.number().refine(false)).toThrow(TypeError)
+})

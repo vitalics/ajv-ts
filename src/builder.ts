@@ -196,6 +196,9 @@ abstract class SchemaBuilder<
    * Schema.parse([{ active: true, name: 'some 1' }, { active: true, name: 'some 2' }]) // throws Error
    */
   refine(fn: (output: Output) => any) {
+    if (typeof fn !== 'function') {
+      throw new TypeError(`Cannot set for not a function for refine. Expect "function", Got: ${typeof fn}`, { cause: { fn, type: typeof fn } })
+    }
     this.refineFns.push(fn)
     return this
   }
