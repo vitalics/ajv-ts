@@ -219,19 +219,17 @@ test('refine should throws TypeError for not a function', () => {
   expect(() => s.number().refine(false)).toThrow(TypeError)
 })
 
-test.only('default should allow to provide undefined and null', () => {
+test('default should not allow to use in root', () => {
   const num = s.number().default(60000)
-  const el1 = num.parse()
-  const el2 = num.parse(null)
-  expect(el1).toBe(60_000)
-  expect(el2).toBe(60_000)
+  expect(() => num.parse()).toThrow(Error)
 })
 
 test('default should support property in object', () => {
   const ObjSchema = s.object({
     age: s.int().default(18)
   })
-  const parsed = ObjSchema.parse()
+  const parsed = ObjSchema.parse({})
+  console.log('parsed', parsed)
   expect(parsed).toMatchObject({
     age: 18
   })
@@ -240,16 +238,12 @@ test('default should support property in object', () => {
 test('default should support object', () => {
   const ObjSchema = s.object({
     age: s.int().default(18)
-  }).default({ age: 25 })
+  })
 
-  const parsed1 = ObjSchema.parse()
+  const parsed1 = ObjSchema.parse({})
   expect(parsed1).toMatchObject({
-    age: 25
-  })
-  const parsed2 = ObjSchema.parse(null)
-  expect(parsed2).toMatchObject({
-    age: 25
+    age: 18
   })
 
-  expect(() => ObjSchema.parse({})).toThrow(Error)
+  expect(() => ObjSchema.parse(null)).toThrow(Error)
 })

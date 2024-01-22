@@ -9,7 +9,12 @@ import type { Email } from './types/string'
 import type { OmitByValue, OmitMany } from './types/object'
 import { Create, Head, Tail } from './types/array'
 
-export const DEFAULT_AJV = ajvErrors(addFormats(new Ajv({ allErrors: true })))
+/** Default Ajv instance */
+export const DEFAULT_AJV = ajvErrors(addFormats(new Ajv({
+  allErrors: true,
+  useDefaults: true,
+})))
+
 /** Any schema builder. */
 type AnySchemaBuilder =
   | NumberSchemaBuilder
@@ -230,8 +235,6 @@ abstract class SchemaBuilder<
     return this
   }
 
-  private _default: Output | undefined
-
   /**
    * Option `default` keywords throws exception during schema compilation when used in:
    * - not in `properties` or `items` subschemas
@@ -241,7 +244,6 @@ abstract class SchemaBuilder<
    */
   default(value: Output) {
     (this.schema as AnySchema).default = value
-    this._default = value
     return this;
   }
   /**
@@ -404,10 +406,9 @@ abstract class SchemaBuilder<
     return { data: output as Out, input, success: true }
   }
 
-  private _safeParseRaw(input: unknown): SafeParseResult<unknown> {
-    const dataOrDefault = input ?? this._default
+  private _safeParseRaw(input?: unknown): SafeParseResult<unknown> {
     try {
-      const valid: boolean = this.ajv.validate(this.schema, dataOrDefault)
+      const valid: boolean = this.ajv.validate(this.schema, input)
       if (!valid) {
         const firstError = this.ajv.errors?.at(0)
         return {
@@ -415,7 +416,7 @@ abstract class SchemaBuilder<
             cause: {
               error: firstError,
               debug: {
-                input: dataOrDefault,
+                input,
                 errors: this.ajv.errors,
                 schema: this.schema,
               },
@@ -434,7 +435,7 @@ abstract class SchemaBuilder<
     }
     return {
       input,
-      data: dataOrDefault,
+      data: input,
       success: true
     }
   }
