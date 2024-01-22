@@ -35,3 +35,5 @@ s.number().safeParse() // Error, required at least 1 argument
 // After
 s.number().safeParse() // ok now
 ```
+
+- expose default `Ajv` instance.

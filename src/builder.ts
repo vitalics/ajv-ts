@@ -1808,6 +1808,7 @@ export {
   any,
   never,
   not,
+  DEFAULT_AJV as Ajv,
   type Infer as infer,
   type Input as input,
   type AnySchemaBuilder as AnySchema,
