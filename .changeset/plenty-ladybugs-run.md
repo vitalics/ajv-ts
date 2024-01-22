@@ -37,3 +37,15 @@ s.number().safeParse() // ok now
 ```
 
 - expose default `Ajv` instance.
+
+- make `object` builder optional.
+
+Example:
+
+```ts
+import s from 'ajv-ts'
+// Before
+s.object() // error, expected object
+// After
+s.object() // OK, empty object definition
+```
