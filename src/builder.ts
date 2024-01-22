@@ -230,6 +230,8 @@ abstract class SchemaBuilder<
     return this
   }
 
+  private _default: Output | undefined
+
   /**
    * Option `default` keywords throws exception during schema compilation when used in:
    * - not in `properties` or `items` subschemas
@@ -239,6 +241,7 @@ abstract class SchemaBuilder<
    */
   default(value: Output) {
     (this.schema as AnySchema).default = value
+    this._default = value
     return this;
   }
   /**
@@ -369,7 +372,7 @@ abstract class SchemaBuilder<
     return not(this) as never
   }
 
-  private _transform<Out = unknown>(input: unknown, arr: ({ fn: Function, schema: AnySchemaBuilder } | Function)[] = []): SafeParseResult<Out> {
+  private _transform<Out = unknown>(input?: unknown, arr: ({ fn: Function, schema: AnySchemaBuilder } | Function)[] = []): SafeParseResult<Out> {
     let output;
     if (Array.isArray(arr) && arr.length > 0) {
       try {
@@ -402,8 +405,9 @@ abstract class SchemaBuilder<
   }
 
   private _safeParseRaw(input: unknown): SafeParseResult<unknown> {
+    const dataOrDefault = input ?? this._default
     try {
-      const valid: boolean = this.ajv.validate(this.schema, input)
+      const valid: boolean = this.ajv.validate(this.schema, dataOrDefault)
       if (!valid) {
         const firstError = this.ajv.errors?.at(0)
         return {
@@ -411,7 +415,7 @@ abstract class SchemaBuilder<
             cause: {
               error: firstError,
               debug: {
-                input,
+                input: dataOrDefault,
                 errors: this.ajv.errors,
                 schema: this.schema,
               },
@@ -430,7 +434,7 @@ abstract class SchemaBuilder<
     }
     return {
       input,
-      data: input,
+      data: dataOrDefault,
       success: true
     }
   }
@@ -440,21 +444,23 @@ abstract class SchemaBuilder<
    * 
    * It also applies your `postProcess` functions if parsing was successfull
    */
-  safeParse(input: unknown): SafeParseResult<Output> {
+  safeParse(input?: unknown): SafeParseResult<Output> {
     // need to remove schema, or we get precompiled result. It's bad for `extend` and `merge` in object schema
     this.ajv.removeSchema(this.schema)
     let preTransformedResult = this._transform(input, this.preFns);
-
+    preTransformedResult.input = input
     if (!preTransformedResult.success) {
       return preTransformedResult
     }
 
     const parseResult = this._safeParseRaw(preTransformedResult.data)
+    parseResult.input = input
     if (!parseResult.success) {
       return parseResult
     }
 
     const postTransformedResult = this._transform<Output>(parseResult.data, this.postFns)
+    postTransformedResult.input = input
     if (!postTransformedResult.success) {
       return postTransformedResult
     }
@@ -495,7 +501,7 @@ abstract class SchemaBuilder<
    * 
    * @returns {boolean} Validity of your schema
    */
-  validate(input: unknown): input is Output {
+  validate(input?: unknown): input is Output {
     const { success } = this.safeParse(input)
     return success
   }
@@ -506,7 +512,7 @@ abstract class SchemaBuilder<
    * @returns {Output} parsed output result.
    * @throws `Error` when input not match given schema
    */
-  parse(input: unknown): Output {
+  parse(input?: unknown): Output {
     const result = this.safeParse(input)
     if (!result.success) {
       throw result.error
@@ -961,14 +967,18 @@ class ObjectSchemaBuilder<
   Out = ObjectTypes.OptionalUndefined<T>
 > extends SchemaBuilder<T, ObjectSchema, Out> {
 
-  constructor(private def: Definition) {
+  protected def: Definition = {} as Definition
+  constructor(def?: Definition) {
     super({
       type: 'object',
       properties: {},
     })
-    Object.entries(def).forEach(([key, d]) => {
-      this.schema.properties![key] = d.schema
-    })
+    if (def) {
+      Object.entries(def).forEach(([key, d]) => {
+        this.schema.properties![key] = d.schema
+      })
+      this.def = def
+    }
   }
 
   /**
@@ -1226,7 +1236,7 @@ class ObjectSchemaBuilder<
  */
 function object<
   Definitions extends ObjectDefinition,
->(def: Definitions) {
+>(def?: Definitions) {
   return new ObjectSchemaBuilder<Definitions>(def)
 }
 
