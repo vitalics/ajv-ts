@@ -72,11 +72,16 @@ abstract class SchemaBuilder<
   /**
    * JSON-schema representation
    */
-  readonly schema: Schema
+  schema: Schema
 
+  /** Returns your ajv instance */
   get ajv() {
     return this._ajv
   }
+  /**
+   * Set Ajv Instance.
+   * @throws TypeError if not ajv instance comes
+   */
   set ajv(instance: Ajv) {
     if (!(instance instanceof Ajv)) {
       throw new TypeError(`Cannot set ajv variable for non-ajv instance.`, { cause: { type: typeof instance, value: instance } })
@@ -266,6 +271,15 @@ abstract class SchemaBuilder<
   error(message: string) {
     (this.schema as AnySchema).errorMessage = message
     return this
+  }
+
+  /**
+   * set `description` for your schema.
+   * You can use `meta` method to provide information in more consistant way.
+   * @satisfies `zod` API
+   */
+  describe(message: string) {
+    (this.schema as AnySchema).description = message
   }
 
   /** 
@@ -574,10 +588,12 @@ class NumberSchemaBuilder<const N extends number = number> extends SchemaBuilder
     return this
   }
 
+  /** Getter. Retuns `minimum` or `exclusiveMinimum` depends on your schema definition */
   get minValue() {
     return this.schema.minimum ?? this.schema.exclusiveMinimum as number
   }
 
+  /** Getter. Retuns `maximum` or `exclusiveMaximum` depends on your schema definition */
   get maxValue() {
     return this.schema.maximum ?? this.schema.exclusiveMaximum as number
   }
@@ -1243,41 +1259,56 @@ class ObjectSchemaBuilder<
   }
 }
 /**
- * Create `object` schema
+ * Create `object` schema.
+ * 
+ * JSON schema: `{type: 'object', properties: {}}`
+ * 
+ * You can pass you object type to get typescript validation
+ * @example
+ * import s from 'ajv-ts'
+ * type User = {
+ *   name: string;
+ *   age: number;
+ * };
+ * const UserSchema = s.object<User>({}) // typescript error: expect type User, got {}
  */
 function object<
-  Definitions extends ObjectDefinition,
+  ObjType extends { [key: string]: string | number | boolean | null | undefined | unknown[] | object },
+  Definitions extends ObjectDefinition = { [K in keyof ObjType]: MatchTypeToBuilder<ObjType[K]> },
 >(def?: Definitions) {
   return new ObjectSchemaBuilder<Definitions>(def)
 }
 
 class RecordSchemaBuilder<ValueDef extends AnySchemaBuilder = AnySchemaBuilder> extends SchemaBuilder<Record<string, Infer<ValueDef>>, ObjectSchema>{
-
-  constructor(def: ValueDef) {
+  private def?: ValueDef
+  constructor(def?: ValueDef) {
     super({
       type: 'object',
-      additionalProperties: def.schema
+      additionalProperties: {} as AnySchemaOrAnnotation
     })
+    if (def) {
+      this.schema.additionalProperties = def.schema
+    }
   }
-
 }
 
 /** 
  * Same as `object` but less strict for properties. 
  * 
- * Same as `object({}).passthrough()`
+ * Same as `object().passthrough()`
  * @see {@link object}
  */
-function record<Def extends AnySchemaBuilder>(valueDef: Def) {
+function record<Def extends AnySchemaBuilder>(valueDef?: Def) {
   return new RecordSchemaBuilder<Def>(valueDef)
 }
 
 
 class ArraySchemaBuilder<
-  S extends SchemaBuilder[] = SchemaBuilder[],
+  S extends SchemaBuilder<any, any, any>[] = SchemaBuilder[],
 > extends SchemaBuilder<
-  InferArray<S>,
-  ArraySchema
+  Infer<S[number]>,
+  ArraySchema,
+  InferArray<S>
 > {
   constructor(...definitions: S) {
     super({ type: 'array', items: definitions?.map(def => def.schema) ?? [], minItems: 0 })
@@ -1655,7 +1686,7 @@ function keyof<
   return or(...schemas) as never
 }
 
-class UnknownSchemaBuilder<T extends unknown | any> extends SchemaBuilder<T, AnySchemaOrAnnotation>{
+class UnknownSchemaBuilder<T extends unknown | any> extends SchemaBuilder<T, any>{
   constructor() {
     super({} as AnySchemaOrAnnotation)
   }
@@ -1666,8 +1697,8 @@ class UnknownSchemaBuilder<T extends unknown | any> extends SchemaBuilder<T, Any
  * 
  * JSON schema - `{}` (empty object)
  */
-function any() {
-  return new UnknownSchemaBuilder<any>()
+function any(): SchemaBuilder<any, any> {
+  return new UnknownSchemaBuilder()
 }
 
 /**
@@ -1829,3 +1860,15 @@ type InferArray<T extends SchemaBuilder[], Result extends unknown[] = []> =
 
 /** extract schema input type */
 export type Input<T extends SchemaBuilder<any, any, any>> = T['_input']
+
+type MatchTypeToBuilder<T extends number | boolean | string | object | unknown[] | null | undefined> =
+  T extends boolean ? BooleanSchemaBuilder<T>
+  : T extends Array<infer El extends number | string | object | boolean | null> ? ArraySchemaBuilder<MatchTypeToBuilder<El>[]>
+  : T extends string ? StringSchemaBuilder<T>
+  : T extends number ? NumberSchemaBuilder<T>
+  : T extends Record<string, number | boolean | string | object | unknown[] | null> ? { [K in keyof T]: MatchTypeToBuilder<T[K]> }
+  : T extends null ? NullSchemaBuilder
+  : T extends undefined ? SchemaBuilder<T | undefined, any, T | undefined>
+  : T extends unknown ? UnknownSchemaBuilder<T>
+  : T extends SchemaBuilder<any, any, infer Out> ? SchemaBuilder<any, any, Out>
+  : SchemaBuilder<any, any, any>

@@ -7,11 +7,9 @@ const Test = s.object({
   f1: s.number(),
   f2: s.string().optional(),
   f3: s.string().nullable(),
-  f4: s.array(
-    s.object({
-      t: s.union(s.string(), s.boolean())
-    })
-  )
+  f4: s.object({
+    t: s.union(s.string(), s.boolean())
+  }).array()
 });
 
 type Test = s.infer<typeof Test>;
@@ -197,8 +195,8 @@ test("inferred picked object type with optional properties", async () => {
 
 test("inferred type for unknown/any keys", () => {
   const myType = s.object({
-    anyOptional: s.any().optional(),
     anyRequired: s.any(),
+    anyOptional: s.any().optional(),
     unknownOptional: s.unknown().optional(),
     unknownRequired: s.unknown(),
   });
@@ -377,4 +375,14 @@ test('optional properties', () => {
   } & {
     qwe: string;
   }>(true)
+})
+
+test('object accepts type as generic', () => {
+  type MyObj = {
+    age: number;
+    name: string;
+  }
+  const Schema = s.object<MyObj>()
+
+  assertEqualType<MyObj, s.infer<typeof Schema>>(true)
 })
