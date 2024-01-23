@@ -7,6 +7,7 @@
   - [Zod unsupported APIs/differences](#zod-unsupported-apisdifferences)
   - [Installation](#installation)
   - [Basic usage](#basic-usage)
+  - [JSON schema overriding](#json-schema-overriding)
   - [Defaults](#defaults)
   - [Primitives](#primitives)
   - [Constant values(literals)](#constant-valuesliterals)
@@ -122,6 +123,49 @@ User.parse({ username: "Ludwig" });
 // extract the inferred type
 type User = s.infer<typeof User>;
 // { username: string }
+```
+
+## JSON schema overriding
+
+In case of you have alredy defined JSON-schema, you create an `any/object/number/string/boolean/null` schema and set `schema` property from your schema.
+
+Example:
+
+```ts
+import s from 'ajv-ts'
+
+const SchemaFromSomewhere = {
+ "title": "Example Schema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "age": {
+      "description": "Age in years",
+      "type": "integer",
+      "minimum": 0
+    },
+  },
+  "required": ["name", "age"]
+}
+
+type MySchema = {
+  name: string;
+  age: number
+}
+
+const AnySchema = s.any()
+AnySchema.schema = SchemaFromSomewhere
+
+AnySchema.parse({name: 'hello', age: 18}) // OK, since we override JSON-schema
+
+// or using object
+const Obj = s.object<MySchema>()
+Obj.schema = SchemaFromSomewhere
+
+Obj.parse({name: 'hello', age: 18}) // OK
+
 ```
 
 ## Defaults

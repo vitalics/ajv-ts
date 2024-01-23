@@ -247,3 +247,39 @@ test('default should support object', () => {
 
   expect(() => ObjSchema.parse(null)).toThrow(Error)
 })
+
+test('should support schema overriding', () => {
+
+  const MyJsonSchema = {
+    "title": "Example Schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "age": {
+        "description": "Age in years",
+        "type": "integer",
+        "minimum": 0
+      },
+    },
+    "required": ["name", "age"]
+  } as const
+
+  type CustomObject = {
+    name: string;
+    age: number
+  }
+  const AnySchema = s.any()
+  AnySchema.schema = MyJsonSchema
+
+  const parsed = AnySchema.parse({ name: 'hello', age: 18 })
+  expect(parsed).toMatchObject({
+    name: 'hello',
+    age: 18
+  })
+
+  const Obj = s.object<CustomObject>()
+  Obj.schema = MyJsonSchema
+  assertEqualType<s.infer<typeof Obj>, CustomObject>(true)
+})
