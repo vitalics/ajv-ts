@@ -1831,6 +1831,7 @@ export {
   tuple,
   constant as const,
   makeEnum as enum,
+  makeEnum as nativeEnum,
   and,
   and as intersection,
   or,
