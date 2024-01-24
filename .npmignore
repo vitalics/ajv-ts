@@ -12,3 +12,4 @@ tsup.config.ts
 tsconfig.json
 .eslintrc.json
 CONTRIBUTING.md
+CHANGELOG.md

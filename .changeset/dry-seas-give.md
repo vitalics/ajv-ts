@@ -2,4 +2,12 @@
 "ajv-ts": patch
 ---
 
-zod compatibility: `nativeEnum`
+This release contains zod compatibility
+
+## Zod Compatibility
+
+expose `nativeEnum`.
+
+## Fixes
+
+`describe` now returns `SchemaBuilder`; was `void`.

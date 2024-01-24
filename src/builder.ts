@@ -6,7 +6,7 @@ import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, } from '
 import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
 import type { IsPositiveInteger } from './types/number'
 import type { Email } from './types/string'
-import type { OmitByValue, OmitMany } from './types/object'
+import type { OmitByValue, OmitMany, PickMany } from './types/object'
 import { Create, Head, Tail } from './types/array'
 
 /** Default Ajv instance */
@@ -32,13 +32,7 @@ type AnySchemaBuilder =
   | UnknownSchemaBuilder<unknown>
   | NotSchemaBuilder
 
-type MetaObject =
-  & Pick<BaseSchema, 'title'>
-  & Pick<BaseSchema, 'description'>
-  & Pick<BaseSchema, 'deprecated'>
-  & Pick<BaseSchema, '$id'>
-  & Pick<BaseSchema, '$async'>
-  & Pick<BaseSchema, '$ref'>
+type MetaObject = PickMany<BaseSchema, ['title', 'description', 'deprecated', '$id', '$async', '$ref']>
 
 export type SafeParseResult<T> = SafeParseSuccessResult<T> | SafeParseErrorResult
 
@@ -214,29 +208,12 @@ abstract class SchemaBuilder<
   }
 
   /**
-   * Meta object. Add additional fields in your schema
+   * Meta object. Adds meta information fields in your schema, such as `deprecated`, `description`, `$id`, `title` and more!
    */
   meta(obj: MetaObject) {
-    if ('type' in this.schema) {
-      if (obj.deprecated) {
-        this.schema.deprecated = obj.deprecated
-      }
-      if (obj.description) {
-        this.schema.description = obj.description
-      }
-      if (obj.title) {
-        this.schema.title = obj.title
-      }
-      if (obj.$id) {
-        this.schema.$id = obj.$id
-      }
-      if (obj.$ref) {
-        this.schema.$ref = obj.$ref
-      }
-      if (obj.$async) {
-        this.schema.$async = obj.$async
-      }
-    }
+    Object.entries(obj).forEach(([key, value]) => {
+      this.custom(key, value)
+    })
     return this
   }
 
@@ -276,10 +253,11 @@ abstract class SchemaBuilder<
   /**
    * set `description` for your schema.
    * You can use `meta` method to provide information in more consistant way.
+   * @see {@link SchemaBuilder.meta meta} method
    * @satisfies `zod` API
    */
   describe(message: string) {
-    (this.schema as AnySchema).description = message
+    return this.meta({ description: message })
   }
 
   /** 
