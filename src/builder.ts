@@ -1594,6 +1594,10 @@ class ConstantSchemaBuilder<
 }
 /** 
  * `const` is used to restrict a value to a single value.
+ *
+ * zod differences - `Date` is supported.
+ * @alias literal
+ * @satisfies zod API. **NOTE:** `Symbol`, unserializable `object` is not supported and throws error.
  * @example
  * const constant = s.const("Hello World")
  * constant.validate("Hello World") // true
@@ -1775,6 +1779,7 @@ function create(ajv: Ajv) {
     string: injectAjv(ajv, string) as typeof string,
     null: injectAjv(ajv, nil) as typeof nil,
     enum: injectAjv(ajv, makeEnum) as typeof makeEnum,
+    nativeEnum: injectAjv(ajv, makeEnum) as typeof makeEnum,
     boolean: injectAjv(ajv, boolean) as typeof boolean,
     object: injectAjv(ajv, object) as typeof object,
     keyof: injectAjv(ajv, keyof) as typeof keyof,
@@ -1782,6 +1787,7 @@ function create(ajv: Ajv) {
     array: injectAjv(ajv, array) as typeof array,
     tuple: injectAjv(ajv, tuple) as typeof tuple,
     const: injectAjv(ajv, constant) as typeof constant,
+    literal: injectAjv(ajv, constant) as typeof constant,
     unknown: injectAjv(ajv, unknown) as typeof unknown,
     any: injectAjv(ajv, any) as typeof any,
     never: injectAjv(ajv, never) as typeof never,
@@ -1808,6 +1814,7 @@ export {
   array,
   tuple,
   constant as const,
+  constant as literal,
   makeEnum as enum,
   makeEnum as nativeEnum,
   and,
