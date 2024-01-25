@@ -63,8 +63,8 @@ abstract class SchemaBuilder<
    */
   _output!: Output
 
-  _schema: Schema
-  _shape: Schema
+  private _schema: Schema
+  private _shape: Schema
 
   /**
    * returns JSON-schema representation

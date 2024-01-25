@@ -283,3 +283,19 @@ test('should support schema overriding', () => {
   Obj.schema = MyJsonSchema
   assertEqualType<s.infer<typeof Obj>, CustomObject>(true)
 })
+
+test('should shape update schema property too', () => {
+  const NumberSchema = { type: 'number', const: 123 } as const
+
+  const AnySchema = s.any()
+  AnySchema.shape = NumberSchema
+  expect(AnySchema.schema).toMatchObject(NumberSchema)
+})
+
+test('should shema update shape property too', () => {
+  const NumberSchema = { type: 'number', const: 123 } as const
+
+  const AnySchema = s.any()
+  AnySchema.schema = NumberSchema
+  expect(AnySchema.shape).toMatchObject(NumberSchema)
+})
