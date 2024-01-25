@@ -1,5 +1,20 @@
 # ajv-ts
 
+## 0.6.3
+
+### Patch Changes
+
+- b315539: This release contains zod compatibility
+
+  ## Zod Compatibility
+
+  - expose `nativeEnum` function.
+  - expose `literal` function, this is the same as `const` does.
+
+  ## Fixes
+
+  `describe` now returns `SchemaBuilder`; was `void`.
+
 ## 0.6.2
 
 ### Patch Changes
