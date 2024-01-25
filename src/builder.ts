@@ -63,18 +63,50 @@ abstract class SchemaBuilder<
    */
   _output!: Output
 
+  _schema: Schema
+  _shape: Schema
+
   /**
-   * JSON-schema representation
+   * returns JSON-schema representation
    */
-  schema: Schema
+  get schema(){
+    return this._schema
+  }
+  /**
+   * returns JSON-schema representation. same as `schema` does.
+   * @satisfies zod API
+   */
+  get shape(){
+    return this._shape
+  }
+
+  /**
+   * Set custom JSON-Schema representation.
+   * Updates `shape` property too
+   */
+  set schema(schema){
+    this._schema = schema
+    this._shape = schema
+  }
+
+  /**
+   * Set custom JSON-Schema representation.
+   * Updates `schema` property too
+   * @satisfies zod API
+   */
+  set shape(schema){
+    this._schema = schema
+    this._shape = schema
+  }
 
   /** Returns your ajv instance */
   get ajv() {
     return this._ajv
   }
+
   /**
    * Set Ajv Instance.
-   * @throws TypeError if not ajv instance comes
+   * @throws `TypeError` if not ajv instance comes
    */
   set ajv(instance: Ajv) {
     if (!(instance instanceof Ajv)) {
@@ -84,7 +116,8 @@ abstract class SchemaBuilder<
   }
 
   constructor(schema: Schema, private _ajv = DEFAULT_AJV) {
-    this.schema = schema
+    this._schema = schema
+    this._shape = schema
   }
   protected isNullable = false
 
