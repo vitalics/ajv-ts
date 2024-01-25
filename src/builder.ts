@@ -6,7 +6,7 @@ import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, } from '
 import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
 import type { IsPositiveInteger } from './types/number'
 import type { Email } from './types/string'
-import type { OmitByValue, OmitMany } from './types/object'
+import type { OmitByValue, OmitMany, PickMany } from './types/object'
 import { Create, Head, Tail } from './types/array'
 
 /** Default Ajv instance */
@@ -32,13 +32,7 @@ type AnySchemaBuilder =
   | UnknownSchemaBuilder<unknown>
   | NotSchemaBuilder
 
-type MetaObject =
-  & Pick<BaseSchema, 'title'>
-  & Pick<BaseSchema, 'description'>
-  & Pick<BaseSchema, 'deprecated'>
-  & Pick<BaseSchema, '$id'>
-  & Pick<BaseSchema, '$async'>
-  & Pick<BaseSchema, '$ref'>
+type MetaObject = PickMany<BaseSchema, ['title', 'description', 'deprecated', '$id', '$async', '$ref']>
 
 export type SafeParseResult<T> = SafeParseSuccessResult<T> | SafeParseErrorResult
 
@@ -214,29 +208,12 @@ abstract class SchemaBuilder<
   }
 
   /**
-   * Meta object. Add additional fields in your schema
+   * Meta object. Adds meta information fields in your schema, such as `deprecated`, `description`, `$id`, `title` and more!
    */
   meta(obj: MetaObject) {
-    if ('type' in this.schema) {
-      if (obj.deprecated) {
-        this.schema.deprecated = obj.deprecated
-      }
-      if (obj.description) {
-        this.schema.description = obj.description
-      }
-      if (obj.title) {
-        this.schema.title = obj.title
-      }
-      if (obj.$id) {
-        this.schema.$id = obj.$id
-      }
-      if (obj.$ref) {
-        this.schema.$ref = obj.$ref
-      }
-      if (obj.$async) {
-        this.schema.$async = obj.$async
-      }
-    }
+    Object.entries(obj).forEach(([key, value]) => {
+      this.custom(key, value)
+    })
     return this
   }
 
@@ -276,10 +253,11 @@ abstract class SchemaBuilder<
   /**
    * set `description` for your schema.
    * You can use `meta` method to provide information in more consistant way.
+   * @see {@link SchemaBuilder.meta meta} method
    * @satisfies `zod` API
    */
   describe(message: string) {
-    (this.schema as AnySchema).description = message
+    return this.meta({ description: message })
   }
 
   /** 
@@ -1616,6 +1594,10 @@ class ConstantSchemaBuilder<
 }
 /** 
  * `const` is used to restrict a value to a single value.
+ *
+ * zod differences - `Date` is supported.
+ * @alias literal
+ * @satisfies zod API. **NOTE:** `Symbol`, unserializable `object` is not supported and throws error.
  * @example
  * const constant = s.const("Hello World")
  * constant.validate("Hello World") // true
@@ -1797,6 +1779,7 @@ function create(ajv: Ajv) {
     string: injectAjv(ajv, string) as typeof string,
     null: injectAjv(ajv, nil) as typeof nil,
     enum: injectAjv(ajv, makeEnum) as typeof makeEnum,
+    nativeEnum: injectAjv(ajv, makeEnum) as typeof makeEnum,
     boolean: injectAjv(ajv, boolean) as typeof boolean,
     object: injectAjv(ajv, object) as typeof object,
     keyof: injectAjv(ajv, keyof) as typeof keyof,
@@ -1804,6 +1787,7 @@ function create(ajv: Ajv) {
     array: injectAjv(ajv, array) as typeof array,
     tuple: injectAjv(ajv, tuple) as typeof tuple,
     const: injectAjv(ajv, constant) as typeof constant,
+    literal: injectAjv(ajv, constant) as typeof constant,
     unknown: injectAjv(ajv, unknown) as typeof unknown,
     any: injectAjv(ajv, any) as typeof any,
     never: injectAjv(ajv, never) as typeof never,
@@ -1830,6 +1814,7 @@ export {
   array,
   tuple,
   constant as const,
+  constant as literal,
   makeEnum as enum,
   makeEnum as nativeEnum,
   and,
