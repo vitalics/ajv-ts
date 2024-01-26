@@ -15,7 +15,7 @@ type t0 = s.infer<typeof empty>
 assertEqualType<unknown[], t0>(true)
 
 type t1 = s.infer<typeof nonEmptyMax>;
-assertEqualType<[string, string], t1>(true);
+assertEqualType<[string, ...string[]], t1>(true);
 
 type t2 = s.infer<typeof minTwo>;
 assertEqualType<[string, string, ...string[]], t2>(true);
@@ -26,11 +26,9 @@ assertEqualType<[string, ...string[]], t3>(true);
 test("passing validations", () => {
   expect(minTwo.schema).toMatchObject({
     type: "array",
-    items: [
-      {
-        type: "string"
-      }
-    ],
+    items: {
+      type: "string"
+    },
     minItems: 2
   })
   minTwo.parse(["a", "a"]);
@@ -66,6 +64,8 @@ test('invariant for array schema', () => {
 
 test('addItems should append the schema for array', () => {
   const str = empty.addItems(s.string())
+  type T = s.infer<typeof str>;
+  assertEqualType<T, [...unknown[], string]>(true)
   expect(str.schema).toMatchObject({
     type: 'array',
     minItems: 0,
@@ -74,4 +74,42 @@ test('addItems should append the schema for array', () => {
     }]
   })
 
+})
+
+test('addItems should append array of elements for empty definition', () => {
+  const empty = s.array()
+  expect(empty.schema).toMatchObject({
+    type: 'array',
+    minItems: 0,
+    items: {}
+  })
+  const nonEmpty = empty.addItems(s.string())
+  expect(nonEmpty.schema).toMatchObject({
+    type: 'array',
+    minItems: 0,
+    items: [{ type: 'string' }]
+  })
+})
+
+test('addItems should replace items=false value', () => {
+  const arr = s.array()
+  arr.schema.items = false
+  arr.addItems(s.string())
+  expect(arr.schema).toMatchObject({
+    type: 'array',
+    minItems: 0,
+    items: [{
+      type: 'string'
+    }]
+  })
+
+})
+
+test('element should returns SchemaBuilder instance', () => {
+  const elemSchema = nonEmpty.element
+  assertEqualType<s.infer<typeof elemSchema>, string>(true)
+  expect(elemSchema).toBeInstanceOf(s.SchemaBuilder)
+  expect(elemSchema.schema).toMatchObject({
+    type: 'string'
+  })
 })

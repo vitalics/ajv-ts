@@ -1,5 +1,7 @@
 import { Create } from './array'
 import { Reverse } from './string';
+
+/** `T>=U` */
 export type GreaterThan<T extends number, U extends number> = Create<U> extends [...Create<T>, ...infer _] ? false : true;
 
 export type IsFloat<N extends number | string> = N extends number

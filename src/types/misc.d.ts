@@ -23,3 +23,15 @@ type LastInUnion<U> = UnionToIntersection<
 export type UnionToTuple<U, Last = LastInUnion<U>> = [U] extends [never]
   ? []
   : [...UnionToTuple<Exclude<U, Last>>, Last];
+
+export type IsUnknown<T> =
+  T extends number ? false
+  : T extends string ? false
+  : T extends string ? false
+  : T extends boolean ? false
+  : T extends symbol ? false
+  : T extends undefined ? false
+  : T extends null ? false
+  : T extends object ? false
+  : T extends unknown ? true
+  : false

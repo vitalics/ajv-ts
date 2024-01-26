@@ -21,3 +21,5 @@ export type Length<T extends unknown[] = []> = T['length']
 
 export type Head<T> = T extends [infer First, ...unknown[]] ? First : never;
 export type Tail<T> = T extends [infer _, ...infer Rest] ? Rest : [];
+
+export type MakeReadonly<T extends readonly unknown[]> = readonly T

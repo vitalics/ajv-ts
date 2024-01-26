@@ -229,7 +229,6 @@ test('default should support property in object', () => {
     age: s.int().default(18)
   })
   const parsed = ObjSchema.parse({})
-  console.log('parsed', parsed)
   expect(parsed).toMatchObject({
     age: 18
   })
