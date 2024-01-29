@@ -12,7 +12,7 @@
     "ci:publish": "changeset publish"
   },
   "author": "Vitali Haradkou <vitalicset@yandex.ru>",
-  "homepage": "https://github.com/vitalics/ajv-ts/README.md",
+  "homepage": "https://github.com/vitalics/ajv-ts",
   "keywords": [
     "ajv",
     "validation",
