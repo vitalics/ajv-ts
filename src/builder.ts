@@ -1,13 +1,13 @@
 import Ajv from 'ajv'
-import addFormats from 'ajv-formats'
 import ajvErrors from 'ajv-errors'
+import addFormats from 'ajv-formats'
 
-import type { UnionToTuple, UnionToIntersection, Object as ObjectTypes, IsUnknown, } from './types/index'
-import type { BaseSchema, AnySchemaOrAnnotation, BooleanSchema, NumberSchema, ObjectSchema, StringSchema, ArraySchema, EnumAnnotation, NullSchema, ConstantAnnotation, AnySchema } from './schema/types'
+import type { AnySchema, AnySchemaOrAnnotation, ArraySchema, BaseSchema, BooleanSchema, ConstantAnnotation, EnumAnnotation, NullSchema, NumberSchema, ObjectSchema, StringSchema } from './schema/types'
+import { Create, MakeReadonly } from './types/array'
+import type { Object as ObjectTypes, UnionToIntersection, UnionToTuple } from './types/index'
 import type { GreaterThan, IsPositiveInteger } from './types/number'
-import type { Email } from './types/string'
 import type { OmitByValue, OmitMany, PickMany } from './types/object'
-import { Create, Head, MakeReadonly, Tail } from './types/array'
+import type { Email } from './types/string'
 
 /** Default Ajv instance */
 export const DEFAULT_AJV = ajvErrors(addFormats(new Ajv({
@@ -143,7 +143,7 @@ export abstract class SchemaBuilder<
 
   /**
    * Marks your property as nullable (`undefined`)
-   * 
+   *
    * **NOTES**: json-schema not accept `undefined` type. It's just `nullable` as typescript `undefined` type.
    */
   optional(): SchemaBuilder<Input, Schema, Output | undefined> {
@@ -152,7 +152,7 @@ export abstract class SchemaBuilder<
 
   /**
    * Marks your property as nullable (`null`).
-   * 
+   *
    * Updates `type` property for your schema.
    * @example
    * const schemaDef = s.string().nullable()
@@ -174,7 +174,7 @@ export abstract class SchemaBuilder<
 
   /**
    * pre process function for incoming result. Transform input **BEFORE** calling `parse`, `safeParse`, `validate` functions
-   * 
+   *
    * **NOTE:** this functions works BEFORE parsing. use it at own risk. (e.g. transform Date object into string)
    * @see {@link SchemaBuilder.parse parse method}
    * @see {@link SchemaBuilder.safeParse safe parse method}
@@ -203,7 +203,7 @@ export abstract class SchemaBuilder<
   private postFns: { fn: Function, schema: AnySchemaBuilder }[] = []
   /**
    * Post process. Use it when you would like to transform result after parsing is happens.
-   * 
+   *
    * **NOTE:** this function override your `input` variable for `safeParse` calling.
    * @see {@link SchemaBuilder.safeParse safeParse method}
    */
@@ -229,7 +229,7 @@ export abstract class SchemaBuilder<
    *  const subArr = arr.filter(el => el.active === true)
    *  if (subArr.length > 1) throw new Error('Array should contains only 1 "active" element')
    * })
-   * 
+   *
    * Schema.parse([{ active: true, name: 'some 1' }, { active: true, name: 'some 2' }]) // throws Error
    */
   refine(fn: (output: Output) => any) {
@@ -252,7 +252,7 @@ export abstract class SchemaBuilder<
 
   /**
    * Option `default` keywords throws exception during schema compilation when used in:
-   * 
+   *
    * - not in `properties` or `items` subschemas
    * - in schemas inside `anyOf`, `oneOf` and `not` ({@link https://github.com/ajv-validator/ajv/issues/42 #42})
    * - in `if` schema
@@ -273,9 +273,9 @@ export abstract class SchemaBuilder<
   }
   /**
    * Defines custom error message for any error.
-   * 
+   *
    * Error object uses {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause `cause`} property
-   * 
+   *
    * Set `schema.errorMessage = message`
    */
   error(message: string) {
@@ -293,9 +293,9 @@ export abstract class SchemaBuilder<
     return this.meta({ description: message })
   }
 
-  /** 
+  /**
    * set `$async=true` for your current schema.
-   * 
+   *
    * @see {@link https://ajv.js.org/guide/async-validation.html ajv async validation}
    */
   async() {
@@ -317,7 +317,7 @@ export abstract class SchemaBuilder<
 
   /**
    * Construct Array schema. Same as `s.array(s.number())`
-   * 
+   *
    * @see {@link array}
    */
   array(): ArraySchemaBuilder<Infer<this>, InferArray<this[]>> {
@@ -326,7 +326,7 @@ export abstract class SchemaBuilder<
 
   /**
    * Same as `s.and()`. Combine current type with another. Logical "AND"
-   * 
+   *
    * Typescript `A & B`
    */
   intersection: typeof this.and = this.and
@@ -344,7 +344,7 @@ export abstract class SchemaBuilder<
   }
   /**
    * Same as `s.or()`. Combine current type with another type. Logical "OR"
-   * 
+   *
    * Typescript: `A | B`
    */
   or<S extends AnySchemaBuilder[] = AnySchemaBuilder[]>(...others: S): UnionSchemaBuilder<[this, ...S]> {
@@ -352,16 +352,16 @@ export abstract class SchemaBuilder<
   }
   /**
    * Same as `s.or()`. Combine current type with another type. Logical "OR"
-   * 
+   *
    * Typescript: `A | B`
    */
   union: typeof this.or = this.or
 
-  /** 
+  /**
    * Exclude given subschema.
-   * 
+   *
    * Append `not` keyword for your schema
-   * 
+   *
    * @see {@link not}
    * @see {@link SchemaBuilder.not not method}
    * @example
@@ -388,16 +388,16 @@ export abstract class SchemaBuilder<
 
   /**
    * Exclude self schema.
-   * 
+   *
    * Wrap your schema with `not` keyword
-   * 
+   *
    * `s.not(s.string())` === `s.string().not()`
-   * 
+   *
    * If you need to append `not` keyword instead of wrap you might need to use {@link SchemaBuilder.exclude `exclude`} method
-   * 
+   *
    * @see {@link not}
    * @see {@link SchemaBuilder.exclude exclude method}
-   * 
+   *
    * @example
    * // not string
    * s
@@ -477,7 +477,7 @@ export abstract class SchemaBuilder<
 
   /**
    * Parse you input result. Used `ajv.validate` under the hood
-   * 
+   *
    * It also applies your `postProcess` functions if parsing was successfull
    */
   safeParse(input?: unknown): SafeParseResult<Output> {
@@ -534,7 +534,7 @@ export abstract class SchemaBuilder<
   }
   /**
    * Validate your schema.
-   * 
+   *
    * @returns {boolean} Validity of your schema
    */
   validate(input?: unknown): input is Output {
@@ -544,7 +544,7 @@ export abstract class SchemaBuilder<
 
   /**
    * Parse input for given schema.
-   * 
+   *
    * @returns {Output} parsed output result.
    * @throws `Error` when input not match given schema
    */
@@ -563,9 +563,9 @@ class NumberSchemaBuilder<const N extends number = number> extends SchemaBuilder
 
   /**
    * change schema type from `any integer number` to `any number`.
-   * 
+   *
    * Set schema `{type: 'number'}`
-   * 
+   *
    * This is default behavior
    */
   number() {
@@ -573,7 +573,7 @@ class NumberSchemaBuilder<const N extends number = number> extends SchemaBuilder
     return this
   }
 
-  /** 
+  /**
    * The `const` keyword is used to restrict a value to a single value.
    * @example
    * const a = s.number().const(5)
@@ -610,7 +610,7 @@ class NumberSchemaBuilder<const N extends number = number> extends SchemaBuilder
   }
 
   min = this.minimum
-  /** 
+  /**
    * Provides minimum value
    *
    * Set schema `minimum = value` (and add `exclusiveMinimum = true` if needed)
@@ -637,10 +637,10 @@ class NumberSchemaBuilder<const N extends number = number> extends SchemaBuilder
    * @see {@link NumberSchemaBuilder.step step}
    * @example
    * const a = s.number().multipleOf(10)
-   * 
+   *
    * a.parse(10) // ok
    * a.parse(9) // error
-   * 
+   *
    * const b = s.number().multipleOf(-0.1)
    * b.parse(1.1) // ok, step is `0.1`
    * b.parse(1) // error, step is not `0.1`
@@ -683,7 +683,7 @@ class NumberSchemaBuilder<const N extends number = number> extends SchemaBuilder
   }
   /**
    * Less than
-   * 
+   *
    * Range: `(value; Infinity)`
    * @see {@link NumberSchemaBuilder.minimum minimum}
    * @see {@link NumberSchemaBuilder.lte lte}
@@ -735,13 +735,13 @@ class NumberSchemaBuilder<const N extends number = number> extends SchemaBuilder
 }
 /**
  * Construct `number` schema.
- * 
- * **NOTE:** By default Ajv fails `{"type": "number"}` (or `"integer"`) 
+ *
+ * **NOTE:** By default Ajv fails `{"type": "number"}` (or `"integer"`)
  * validation for `Infinity` and `NaN`.
- * 
+ *
  * @example
  * const test1 = s.number()
- * 
+ *
  * test1.parse(1) // ok
  * test1.parse('qwe') // error
  */
@@ -751,9 +751,9 @@ function number<const N extends number = number>() {
 
 /**
  * construct `integer` schema.
- * 
+ *
  * Same as `s.number().integer()`
- * 
+ *
  * **NOTE:** By default Ajv fails `{"type": "integer"}` validation for `Infinity` and `NaN`.
  */
 function integer() {
@@ -766,7 +766,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
    * The `pattern` use regular expressions to express constraints.
    * The regular expression syntax used is from JavaScript ({@link https://www.ecma-international.org/publications-and-standards/standards/ecma-262/ ECMA 262}, specifically).
    * However, that complete syntax is not widely supported, therefore it is recommended that you stick to the subset of that syntax described below.
-   * 
+   *
    * - A single unicode character (other than the special characters below) matches itself.
    * - `.`: Matches any character except line break characters. (Be aware that what constitutes a line break character is somewhat dependent on your platform and language environment, but in practice this rarely matters).
    * - `^`: Matches only at the beginning of the string.
@@ -788,7 +788,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
    * - `{x}?`, `{x,y}?`, `{x,}?`: Lazy versions of the above expressions.
    * @example
    * const phoneNumber = s.string().pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$")
-   * 
+   *
    * phoneNumber.parse("555-1212") // OK
    * phoneNumber.parse("(888)555-1212") // OK
    * phoneNumber.parse("(888)555-1212 ext. 532") // Error
@@ -817,7 +817,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
 
   /**
    * Define minimum string length.
-   * 
+   *
    * Same as `min`
    * @see {@link StringSchemaBuilder.min min}
    */
@@ -835,7 +835,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
   }
   /**
    * Define minimum string length.
-   * 
+   *
    * Same as `minLength`
    * @see {@link StringSchemaBuilder.minLength minLength}
    */
@@ -843,7 +843,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
 
   /**
    * Define maximum string length.
-   * 
+   *
    * Same as `max`
    * @see {@link StringSchemaBuilder.max max}
    */
@@ -861,7 +861,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
   }
   /**
    * Define maximum string length.
-   * 
+   *
    * Same as `maxLength`
    * @see {@link StringSchemaBuilder.maxLength maxLength}
    */
@@ -869,9 +869,9 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
 
   /**
    * Define exact string length
-   * 
+   *
    * Same as `s.string().min(v).max(v)`
-   * 
+   *
    * @see {@link StringSchemaBuilder.minLength minLength}
    * @see {@link StringSchemaBuilder.maxLength maxLength}
    * @example
@@ -891,7 +891,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
   ) {
     return this.maxLength(value).minLength(value)
   }
-  /** 
+  /**
    * Define non empty string. Same as `minLength(1)`
    */
   nonEmpty() {
@@ -900,7 +900,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
 
   /**
    * A string is valid against this format if it represents a valid e-mail address format.
-   * 
+   *
    * Example: `some@gmail.com`
    */
   email(): OmitMany<StringSchemaBuilder<Email>, ['format', 'ipv4', 'ipv6', 'time', 'date', 'dateTime', 'regex', 'uuid', 'email']> {
@@ -914,9 +914,9 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
   }
   /**
    * A Universally Unique Identifier as defined by {@link https://datatracker.ietf.org/doc/html/rfc4122 RFC 4122}.
-   * 
+   *
    * Same as `s.string().format('uuid')`
-   * 
+   *
    * Example: `3e4666bf-d5e5-4aa7-b8ce-cefe41c7568a`
    */
   uuid() {
@@ -924,9 +924,9 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
   }
   /**
    * A string is valid against this format if it represents a time in the following format: `hh:mm:ss.sTZD`.
-   * 
+   *
    * Same as `s.string().format('time')`
-   * 
+   *
    * Example: `20:20:39+00:00`
    */
   time() {
@@ -936,7 +936,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
    * A string is valid against this format if it represents a date in the following format: `YYYY-MM-DD`.
    *
    * Same as `s.string().format('date')`
-   * 
+   *
    * Example: `2023-10-10`
    */
   date() {
@@ -945,9 +945,9 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
 
   /**
    * A string is valid against this format if it represents a date-time in the following format: `YYYY:MM::DDThh:mm:ss.sTZD`.
-   * 
+   *
    * Same as `s.string().format('date-time')`
-   * 
+   *
    * Example: `2023-10-05T05:49:37.757Z`
    */
   dateTime() {
@@ -956,7 +956,7 @@ class StringSchemaBuilder<const S extends string = string> extends SchemaBuilder
 
   /**
    * A string is valid against this format if it represents a valid regular expression.
-   * 
+   *
    * Same as `s.string().format('regex')`
    */
   regex() {
@@ -1021,7 +1021,7 @@ class ObjectSchemaBuilder<
 
   /**
    * set `additionalProperties=true` for your JSON-schema.
-   * 
+   *
    * Opposite of `strict`
    * @see {@link ObjectSchemaBuilder.strict strict}
    */
@@ -1039,9 +1039,9 @@ class ObjectSchemaBuilder<
 
   /**
    * Makes selected properties partial(not required), rest of them are not changed.
-   * 
+   *
    * Same as for as for `requiredFor('item1').requiredFor('item2')...etc`
-   * 
+   *
    * @example
    * const Test = s.object({
    *  name: s.string(),
@@ -1049,7 +1049,7 @@ class ObjectSchemaBuilder<
    * })
    * .required()
    * .partialFor('email')
-   * 
+   *
    * Test.schema === {
    *  type: 'object',
    *  properties: {
@@ -1127,7 +1127,7 @@ class ObjectSchemaBuilder<
 
   /**
    * Makes 1 property required, other keys are not required.
-   * 
+   *
    * If some properties is already marked with `requiredFor` - we append new key into `required` JSON schema
    */
   requiredFor<Key extends keyof T = keyof T>(
@@ -1141,7 +1141,7 @@ class ObjectSchemaBuilder<
 
   /**
    * Make **ALL** properties in your object required.
-   * 
+   *
    * If you need to make 1 property required - use {@link ObjectSchemaBuilder.requiredFor}
    */
   required(): ObjectSchemaBuilder<Definition, Required<T>> {
@@ -1271,9 +1271,9 @@ class ObjectSchemaBuilder<
 }
 /**
  * Create `object` schema.
- * 
+ *
  * JSON schema: `{type: 'object', properties: {}}`
- * 
+ *
  * You can pass you object type to get typescript validation
  * @example
  * import s from 'ajv-ts'
@@ -1291,7 +1291,6 @@ function object<
 }
 
 class RecordSchemaBuilder<ValueDef extends AnySchemaBuilder = AnySchemaBuilder> extends SchemaBuilder<Record<string, Infer<ValueDef>>, ObjectSchema>{
-  private def?: ValueDef
   constructor(def?: ValueDef) {
     super({
       type: 'object',
@@ -1303,9 +1302,9 @@ class RecordSchemaBuilder<ValueDef extends AnySchemaBuilder = AnySchemaBuilder> 
   }
 }
 
-/** 
- * Same as `object` but less strict for properties. 
- * 
+/**
+ * Same as `object` but less strict for properties.
+ *
  * Same as `object().passthrough()`
  * @see {@link object}
  */
@@ -1330,7 +1329,7 @@ class ArraySchemaBuilder<
 
   /**
    * Make your array `readonly`.
-   * 
+   *
    * Set in JSON schema `unevaluatedItems=false`.
    */
   readonly(): ArraySchemaBuilder<El, MakeReadonly<Arr>, S, Prefix> {
@@ -1340,7 +1339,7 @@ class ArraySchemaBuilder<
 
   /**
    * set `prefixItems` in your schema.
-   * 
+   *
    * For better DX - we mark main element schema as `element`.
    */
   prefix<Pref extends AnySchemaBuilder[]>(...definitions: Pref): ArraySchemaBuilder<El, [element: El], S, InferArray<Pref>> {
@@ -1348,13 +1347,13 @@ class ArraySchemaBuilder<
     return this as never
   }
 
-  /** 
+  /**
    * Append subschema for current array schema.
-   * 
+   *
    * If your schema contains 1 element - this method will transform to array.
-   * 
+   *
    * **NOTE:** if your schema defined with `items: false` - `boolean` value will be replaced to incoming schema.
-   * 
+   *
    * @example
    * import s from 'ajv-ts'
    * const arr = s
@@ -1403,11 +1402,11 @@ class ArraySchemaBuilder<
     return this
   }
 
-  /** 
+  /**
    * Returns schema builder of the element.
-   * 
+   *
    * If element is an array - returns `ArraySchemaBuilder` instance
-   * 
+   *
    * @example
    * import s from 'ajv-ts'
    * const strArr = s.array(s.string())
@@ -1497,7 +1496,7 @@ class ArraySchemaBuilder<
    * Set the `uniqueItems` keyword to `true`.
    * @example
    * const items = s.array(s.number()).unique()
-   * 
+   *
    * items.parse([1, 2, 3, 4, 5]) // OK
    * items.parse([1, 2, 3, 3, 3]) // Error: items are not unique
    */
@@ -1508,7 +1507,7 @@ class ArraySchemaBuilder<
 
   /**
    * `contains` schema only needs to validate against one or more items in the array.
-   * 
+   *
    * JSON Schema: `{type: 'array', contains: <json-schema>}`
    * @example
    * const arr = s.array().contains(s.number())
@@ -1573,7 +1572,7 @@ class ArraySchemaBuilder<
  * Define schema for array of elements. Accept array of subschemas.
  * @example
  * import s from 'ajv-ts'
- * 
+ *
  * const tuple = s.array(s.string(), s.number())
  * tuple.schema // {type: 'array', items: [{type: 'string'}, {type: 'number'}] }
  */
@@ -1695,7 +1694,7 @@ class ConstantSchemaBuilder<
     super({ const: value })
   }
 }
-/** 
+/**
  * `const` is used to restrict a value to a single value.
  *
  * zod differences - `Date` is supported.
@@ -1754,9 +1753,9 @@ type PropKey = Exclude<PropertyKey, symbol>
 
 /**
  * Extract keys from given schema `s.object` and set as constant for output schema
- * 
+ *
  * TypeScript - `keyof T` type
- * 
+ *
  * JSON schema - `{anyOf: [{const: 'key1'}, {const: 'key2'}, ...] }`
  * @throws `Error` if given schema doesn't have `properties` properties. Only non-empty `object` schema has `properties` properties.
  */
@@ -1779,7 +1778,7 @@ class UnknownSchemaBuilder<T extends unknown | any> extends SchemaBuilder<T, any
 
 /**
  * TypeScript - `any` type
- * 
+ *
  * JSON schema - `{}` (empty object)
  */
 function any(): SchemaBuilder<any, any> {
@@ -1788,9 +1787,9 @@ function any(): SchemaBuilder<any, any> {
 
 /**
  * Same as {@link any} but for typescript better type quality.
- * 
+ *
  * TypeScript - `unknown` type
- * 
+ *
  * JSON schema - `{}` (empty object)
  */
 function unknown() {
@@ -1802,9 +1801,9 @@ class NeverSchemaBuilder extends SchemaBuilder<never> {
     super({ not: {} } as AnySchemaOrAnnotation)
   }
 }
-/** 
+/**
  * Typescript - `never` type.
- * 
+ *
  * JSON Schema - `{ not: {} }`
  */
 function never() {
@@ -1829,18 +1828,18 @@ class NotSchemaBuilder<
 
 /**
  * The `not` declares that an instance validates if it doesn't validate against the given subschema.
- * 
+ *
  * **NOTE:** `s.not(s.string())` and `s.string().not()` is not the same!
- * 
+ *
  * JSON Schema: `{ not: <json schema> }`
- * 
+ *
  * @see {@link https://json-schema.org/understanding-json-schema/reference/combining#not json schema `not` keyword}
  * @see {@link SchemaBuilder.not not method}
  * @example
  * import s from 'ajv-ts'
- * 
+ *
  * const notString = s.not(s.string())
- * 
+ *
  * notString.parse(42) // OK
  * notString.parse({key: 'value'}) // OK
  * notString.parse('I am a string') // throws
@@ -1864,7 +1863,7 @@ function injectAjv<S extends SchemaBuilder = SchemaBuilder>(ajv: Ajv, schemaBuil
 
 /**
  * Create new instance of schema definition with non default AJV instance
- * 
+ *
  * @example
  * import Ajv from 'ajv'
  * import s from 'ajv-ts'
@@ -1903,35 +1902,10 @@ function create(ajv: Ajv) {
 }
 
 export {
-  create,
-  create as new,
-  number,
-  integer as int,
-  integer,
-  string,
-  boolean,
-  nil as null,
-  object,
-  keyof,
-  record,
-  array,
-  tuple,
-  constant as const,
-  constant as literal,
-  makeEnum as enum,
-  makeEnum as nativeEnum,
-  and,
-  and as intersection,
-  or,
-  or as union,
-  unknown,
-  any,
-  never,
-  not,
-  DEFAULT_AJV as Ajv,
-  type Infer as infer,
-  type Input as input,
-  type AnySchemaBuilder as AnySchema,
+  DEFAULT_AJV as Ajv, and, any, array, boolean, constant as const, create, makeEnum as enum, integer as int,
+  integer, and as intersection, keyof, constant as literal, makeEnum as nativeEnum, never, create as new, not, nil as null, number, object, or, record, string, tuple, or as union,
+  unknown, type AnySchemaBuilder as AnySchema, type Infer as infer,
+  type Input as input
 }
 
 /**
