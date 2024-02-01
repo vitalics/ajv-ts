@@ -39,9 +39,9 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.26.2",
+    "@changesets/cli": "2.26.2",
     "@typescript-eslint/eslint-plugin": "6.4.0",
-    "bun-types": "latest",
+    "bun-types": "1.0.25",
     "eslint": "8.0.1",
     "eslint-config-standard-with-typescript": "latest",
     "eslint-plugin-import": "2.25.2",
