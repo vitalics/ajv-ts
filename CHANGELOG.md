@@ -1,5 +1,18 @@
 # ajv-ts
 
+## 0.6.3
+
+### Patch Changes
+
+- f5b5403: patch release
+- 3d0d56d: $schema in meta support(#49)
+- 84fe084: fix: homepage link, organize imports, exports (#48)
+- f5b5403: feature: array.element. Add tests for addItems (#47)
+- 4421ac8 chore: npmignore (#45)
+- 152ebfa add `shape` for zod compatibility (#44)
+- 9f98286 Zod: expose literal function (#42)
+- b315539 feature: expose nativeEnum to zod compatibility (#39)
+
 ## 0.6.2
 
 ### Patch Changes
