@@ -1,5 +1,11 @@
 # ajv-ts
 
+## 0.6.3
+
+### Patch Changes
+
+- f5b5403: patch release
+
 ## 0.6.2
 
 ### Patch Changes
