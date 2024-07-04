@@ -57,7 +57,7 @@
     - [Preprocess](#preprocess)
     - [Postprocess](#postprocess)
   - [Error handling](#error-handling)
-    - [error](#error)
+    - [Error Map](#error-map)
     - [refine](#refine)
 
 JSON schema builder like in ZOD-like API
@@ -971,11 +971,57 @@ ToString.parse({}) // error: expects number. Postprocess has not been called
 
 ## Error handling
 
-### error
+Error handling and error maps based from official package [`ajv-errors`](https://ajv.js.org/packages/ajv-errors.html#templates). You can check in out from there.
 
-Defines custom error message for any error. Error message from [`ajv-error`](https://ajv.js.org/packages/ajv-errors.html) package
+Defines custom error message for not valid schema.
 
-Set `schema.errorMessage = message`.
+```ts
+const S1 = s.string().error('Im fails unexpected')
+S1.parse({}) // throws: Im fails unexpected
+```
+
+### Error Map
+
+You can define custom error map.
+In most cases you can pass just a string for invalidation.
+Also, you can pass error map.
+
+Example:
+
+```ts
+import s from 'ajv-ts'
+
+const s1 = s.string().error({ _: "any error here" })
+
+s.parse(123) // throws "any error here"
+
+s.string().error({ _: "any error here", type: "not a string. Custom" })
+
+s.parse(123) // throws "not a string. Custom"
+
+const Obj = s
+  .object({ foo: s.string(),})
+  .strict()
+  .error({ additionalProperties: "Not expected to pass additional props" });
+
+Obj.parse({foo: 'ok', bar: true}) // throws "Not expected to pass additional props"
+```
+
+```ts
+const Schema = s
+    .object({
+      foo: s.integer().minimum(2),
+      bar: s.string().minLength(2),
+    })
+    .strict()
+    .error({
+      properties: {
+        foo: "data.foo should be integer >= 2",
+        bar: "data.bar should be string with length >= 2",
+      },
+    });
+Schema.parse({ foo: 1, bar: "a" }) // throws: "data.foo should be integer >= 2"
+```
 
 ### refine
 
