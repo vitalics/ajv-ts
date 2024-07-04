@@ -1,7 +1,7 @@
 {
   "name": "ajv-ts",
   "description": "JSON-schema builder with typescript safety",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
