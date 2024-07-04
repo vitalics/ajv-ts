@@ -35,3 +35,23 @@ export type IsUnknown<T> =
   : T extends object ? false
   : T extends unknown ? true
   : false
+
+export type ToPrimal<T> =
+  T extends number ? number
+  : T extends string ? string
+  : T extends boolean ? boolean
+  : T extends bigint ? bigint
+  : T extends symbol ? symbol
+  : T extends readonly unknown[] ? unknown[]
+  : T extends object ? object
+  : never
+export type IsNever<T> = [T] extends [never] ? true : false
+
+export type Fn<
+  R = unknown,
+  Args extends readonly unknown[] = [],
+  This = void
+> = (this: This, ...args: Args) => R
+
+export type Return<F extends Fn<any, any>> = F extends Fn<infer Res> ? Res : never
+export type Param<F> = F extends Fn<any, infer Args> ? Args : never

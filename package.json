@@ -5,10 +5,12 @@
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "packageManager": "pnpm@9.4.0",
   "scripts": {
     "build": "tsup",
-    "test": "bun test",
-    "ci:version": "changeset version && bun install --no-frozen-lockfile",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ci:version": "changeset version",
     "ci:publish": "changeset publish"
   },
   "author": "Vitali Haradkou <vitalicset@yandex.ru>",
@@ -39,22 +41,26 @@
     "./package.json": "./package.json"
   },
   "devDependencies": {
+    "@biomejs/biome": "1.8.3",
     "@changesets/cli": "2.26.2",
+    "@types/benchmark": "^2.1.5",
     "@typescript-eslint/eslint-plugin": "6.4.0",
-    "bun-types": "1.0.25",
+    "@vitest/ui": "1.6.0",
+    "benchmark": "2.1.4",
+    "bun-types": "1.1.18",
     "eslint": "8.0.1",
-    "eslint-config-standard-with-typescript": "latest",
     "eslint-plugin-import": "2.25.2",
     "eslint-plugin-n": "15.0.0",
-    "tsup": "7.2.0",
-    "typescript": "5.2.2"
+    "tsup": "8.1.0",
+    "typescript": "5.5.3",
+    "vitest": "1.6.0"
   },
   "peerDependencies": {
     "typescript": ">=5.0.0"
   },
   "dependencies": {
-    "ajv": "8.12.0",
+    "ajv": "8.16.0",
     "ajv-errors": "3.0.0",
-    "ajv-formats": "2.1.1"
+    "ajv-formats": "3.0.1"
   }
 }

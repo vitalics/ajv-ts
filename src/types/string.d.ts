@@ -8,3 +8,8 @@ export type Reverse<S extends string> = S extends `${infer First}${infer Rest}` 
 export type UUID = `${string}-${string}-${string}-${string}-${string}`
 
 export type Email = `${string}@${string}.${string}`
+
+export type JoinArray<
+  Arr extends readonly string[],
+  Result extends string = ''
+> = Arr extends [infer First, ...infer Rest] ? JoinArray<Rest, `${Result}${First}`> : Result

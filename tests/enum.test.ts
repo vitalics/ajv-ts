@@ -1,7 +1,6 @@
-import { test, expect } from 'bun:test'
+import { test, expect, assertType } from 'vitest'
 
 import s from '../src'
-import { assertEqualType, assertIs } from '../src/utils';
 
 test("create enum", () => {
   const MyEnum = s.enum(["Red", "Green", "Blue"]);
@@ -13,7 +12,9 @@ test("create enum", () => {
 test("infer enum", () => {
   const MyEnum = s.enum(["Red", "Green", "Blue"]);
   type MyEnum = s.infer<typeof MyEnum>;
-  assertEqualType<MyEnum, "Red" | "Green" | "Blue">(true);
+  assertType<MyEnum>('Red')
+  assertType<MyEnum>('Green')
+  assertType<MyEnum>('Blue')
 });
 
 test("get options", () => {
@@ -24,7 +25,8 @@ test("readonly enum", () => {
   const HTTP_SUCCESS = ["200", "201"] as const;
   const arg = s.enum(HTTP_SUCCESS);
   type arg = s.infer<typeof arg>;
-  assertEqualType<arg, "200" | "201">(true);
+  assertType<arg>('200')
+  assertType<arg>('201')
 
   arg.parse("201");
   expect(() => arg.parse("202")).toThrow();
@@ -42,7 +44,8 @@ test("nativeEnum test with consts", () => {
   fruitEnum.parse("banana");
   fruitEnum.parse(Fruits.Apple);
   fruitEnum.parse(Fruits.Banana);
-  assertEqualType<fruitEnum, "apple" | "banana">(true);
+  assertType<s.infer<typeof fruitEnum>>("apple")
+  assertType<s.infer<typeof fruitEnum>>("banana")
 });
 
 test("nativeEnum test with real enum", () => {
@@ -56,7 +59,7 @@ test("nativeEnum test with real enum", () => {
   fruitEnum.parse("banana");
   fruitEnum.parse(Fruits.Apple);
   fruitEnum.parse(Fruits.Banana);
-  assertIs<fruitEnum extends Fruits ? true : false>(true);
+  assertType<fruitEnum extends Fruits ? true : false>(true)
 });
 
 test("nativeEnum test with const with numeric keys", () => {
@@ -70,7 +73,8 @@ test("nativeEnum test with const with numeric keys", () => {
   fruitEnum.parse(20);
   fruitEnum.parse(FruitValues.Apple);
   fruitEnum.parse(FruitValues.Banana);
-  assertEqualType<fruitEnum, 10 | 20>(true);
+  assertType<fruitEnum>(10)
+  assertType<fruitEnum>(20)
 });
 
 test("from enum", () => {

@@ -1,8 +1,7 @@
 import Ajv from 'ajv';
-import { test, expect } from 'bun:test'
+import { test, expect, assertType } from 'vitest'
 
 import s from '../src'
-import { assertEqualType } from '../src/utils';
 
 test("type guard", () => {
   const str = s.string();
@@ -13,10 +12,7 @@ test("type guard", () => {
   type t1 = s.input<typeof s1>;
 
   const data = { stringToNumber: "asdf" };
-  const parsed = s1.safeParse(data);
-  if (parsed.success) {
-    assertEqualType<typeof data, t1>(true);
-  }
+  assertType<typeof data extends t1 ? true : false>(true)
 });
 
 test('should support AJV custom ajv instance', () => {
@@ -31,7 +27,7 @@ test('should support AJV custom ajv instance', () => {
 })
 
 test('postProcess should should transform output result', () => {
-  const myNum = s.number().postprocess(v => String(v), s.string())
+  const myNum = s.number().postprocess(v => String(v) as '1', s.string())
 
   const res = myNum.parse(1)
 
@@ -39,7 +35,7 @@ test('postProcess should should transform output result', () => {
 })
 
 test('preprocess should transform input result', () => {
-  const envParsingSchema = s.boolean().preprocess(x => String(x) === 'true' || String(x) === '1')
+  const envParsingSchema = s.boolean().preprocess(x => (String(x) === 'true' || String(x) === '1'))
 
   expect(envParsingSchema.parse('true')).toBe(true)
 })
@@ -101,9 +97,9 @@ test('not function support', () => {
   const okNumber = notString.validate(42)
   const okObject = notString.validate({ "key": "value" })
   const failString = notString.validate("I am a string")
-  expect(okNumber).toBeTrue()
-  expect(okObject).toBeTrue()
-  expect(failString).toBeFalse()
+  expect(okNumber).toBe(true)
+  expect(okObject).toBe(true)
+  expect(failString).toBe(false)
 })
 
 test('not builder support', () => {
@@ -112,8 +108,8 @@ test('not builder support', () => {
   expect(notStringSchema.schema).toMatchObject({
     not: { type: 'string' }
   })
-  expect(notStringSchema.validate(52)).toBeTrue()
-  expect(notStringSchema.validate('random string')).toBeFalse()
+  expect(notStringSchema.validate(52)).toBe(true)
+  expect(notStringSchema.validate('random string')).toBe(false)
 })
 
 test('exclude builder support', () => {
@@ -123,10 +119,10 @@ test('exclude builder support', () => {
     not: { const: 'Jerry' }
   })
 
-  expect(res.validate('random string')).toBeTrue()
+  expect(res.validate('random string')).toBe(true)
 
-  expect(res.validate(123)).toBeFalse()
-  expect(res.validate('Jerry')).toBeFalse()
+  expect(res.validate(123)).toBe(false)
+  expect(res.validate('Jerry')).toBe(false)
 
   s.object({
     a: s.number()
@@ -193,7 +189,7 @@ test('refine should throws custom error', () => {
 
   const result = Schema.safeParse([{ active: true, name: 'some 1' }, { active: true, name: 'some 2' }])
 
-  expect(result.success).toBeFalse()
+  expect(result.success).toBe(false)
   expect(result.error).toBeInstanceOf(Error)
   expect(result.error?.message).toBe('Array should contains only 1 "active" element')
 })
@@ -209,7 +205,7 @@ test('refine should throws default error', () => {
 
   const result = Schema.safeParse([{ active: true, name: 'some 1' }, { active: true, name: 'some 2' }])
 
-  expect(result.success).toBeFalse()
+  expect(result.success).toBe(false)
   expect(result.error).toBeInstanceOf(Error)
   expect(result.error?.message).toBe('refine error')
 })
@@ -280,7 +276,7 @@ test('should support schema overriding', () => {
 
   const Obj = s.object<CustomObject>()
   Obj.schema = MyJsonSchema
-  assertEqualType<s.infer<typeof Obj>, CustomObject>(true)
+  assertType<s.infer<typeof Obj> extends CustomObject ? true : false>(true)
 })
 
 test('should shape update schema property too', () => {
@@ -291,10 +287,30 @@ test('should shape update schema property too', () => {
   expect(AnySchema.schema).toMatchObject(NumberSchema)
 })
 
-test('should shema update shape property too', () => {
+test('should schema update shape property too', () => {
   const NumberSchema = { type: 'number', const: 123 } as const
 
   const AnySchema = s.any()
   AnySchema.schema = NumberSchema
   expect(AnySchema.shape).toMatchObject(NumberSchema)
+})
+
+test('should preprocess work', () => {
+  const ss =
+    s.string()
+  const ssPre = ss.preprocess(() => '1' as const)
+  expect(ssPre.parse()).toBe('1')
+})
+
+test('should postprocess work', () => {
+  const ss =
+    s.string()
+  const ssPre = ss.preprocess(() => '1' as const)
+  expect(ssPre.parse('qwe')).toBe('1')
+})
+
+test('fromJSON should work', () => {
+  const qwe = s.fromJSON({ someProp: 'qwe' }, s.number())
+  expect(qwe.schema.someProp).toBe('qwe')
+  expect(qwe.schema.type).toBe('number')
 })

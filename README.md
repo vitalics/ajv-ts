@@ -12,6 +12,7 @@
   - [Primitives](#primitives)
   - [Constant values(literals)](#constant-valuesliterals)
   - [String](#string)
+    - [Typescript features](#typescript-features)
   - [Numbers](#numbers)
   - [BigInts](#bigints)
   - [NaNs](#nans)
@@ -39,6 +40,7 @@
     - [`.element`](#element)
     - [`.nonempty`](#nonempty)
     - [`.min`/`.max`/`.length`/`.minLength`/`.maxLength`](#minmaxlengthminlengthmaxlength)
+    - [Typescript features](#typescript-features-1)
     - [`.unique`](#unique)
     - [`.contains`/`.minContains`](#containsmincontains)
   - [Tuples](#tuples)
@@ -238,6 +240,20 @@ s.string().format('ipv4');
 s.string().postprocess(v => v.trim());
 s.string().postprocess(v => v.toLowerCase());
 s.string().postprocess(v => v.toUpperCase());
+```
+
+### Typescript features
+
+> from >=0.7.x
+
+Unlike zod - we make typescript validation for `minLength` and `maxLength`. That means you cannot create schema when expected length are negative number or `maxLength < minLength`.
+
+Here is few examples:
+
+```typescript
+s.string().minLength(3).maxLength(1) // [never, "RangeError: MaxLength less than MinLength", "MinLength: 3", "MaxLength: 1"]
+
+s.string().length(-1) // [never, "TypeError: expected positive integer. Received: '-1'"]
 ```
 
 ## Numbers
@@ -740,6 +756,20 @@ s.string().array().length(5); // must contain 5 items exactly
 ```
 
 Unlike `.nonempty()` these methods do not change the inferred type.
+
+### Typescript features
+
+> from >=0.7.x
+
+Unlike zod - we make typescript validation for `minLength` and `maxLength`. That means you cannot create schema when expected length are not positive number or `maxLength < minLength`.
+
+Here is few examples:
+
+```typescript
+s.string().array().minLength(3).maxLength(1) // [never, "RangeError: MaxLength less than MinLength", "MinLength: 2", "MaxLength: 1"]
+
+s.string().array().length(-1) // [never, "TypeError: expected positive integer. Received: '-2'"]
+```
 
 ### `.unique`
 
