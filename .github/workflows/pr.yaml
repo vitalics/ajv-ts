@@ -5,15 +5,46 @@ on:
     branches:
       - main
 
+run-name: PR. Setup, build and test on PR.
+
 jobs:
-  build:
+  node:
+    name: Node.js+pnpm - setup, build and test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node_version: [18, 20, 22, latest]
+        pnpm_version: [9.4.0]
     steps:
       - name: Clone repository
         uses: actions/checkout@v3
-      - uses: oven-sh/setup-bun@v1
-      - run: bun install
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{matrix.pnpm_version}}
+      - name: Use Node.js ${{matrix.node_version}}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install
       - name: Generate build
-        run: bun run build
+        run: pnpm build
       - name: Run Tests
-        run: bun run test
+        run: pnpm run test
+
+  bun:
+    name: Bun.sh - setup, build and test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        bun_version: [1.0.0, 1.1.0, latest]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{matrix.bun_version}}
+      - run: bun install
+      - run: bun run build
+      - run: bun run test

@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { assertType, expect, test } from "vitest";
 
 import { assertEqualType } from "../src/utils";
 import s from "../src";
@@ -7,9 +7,11 @@ const Test = s.object({
   f1: s.number(),
   f2: s.string().optional(),
   f3: s.string().nullable(),
-  f4: s.object({
-    t: s.union(s.string(), s.boolean())
-  }).array()
+  f4: s
+    .object({
+      t: s.union(s.string(), s.boolean()),
+    })
+    .array(),
 });
 
 type Test = s.infer<typeof Test>;
@@ -88,10 +90,9 @@ test("strict", () => {
 });
 
 test("catchall inference", () => {
-  const o1 = s
-    .object({
-      first: s.string(),
-    })
+  const o1 = s.object({
+    first: s.string(),
+  });
 
   const d1 = o1.parse({ first: "asdf", num: 1243 });
   assertEqualType<string, (typeof d1)["first"]>(true);
@@ -137,8 +138,8 @@ test("test async union", async () => {
 });
 
 test("test inferred merged type", async () => {
-  const a = s.object({ a: s.number() })
-  const c = a.extend({ a: s.string() })
+  const a = s.object({ a: s.number() });
+  const c = a.extend({ a: s.string() });
   type asdf = s.infer<typeof c>;
   assertEqualType<asdf, { a: string }>(true);
 });
@@ -188,7 +189,7 @@ test("inferred partial object type with optional properties", async () => {
 test("inferred picked object type with optional properties", async () => {
   const Picked = s
     .object({ a: s.string(), b: s.string().optional() })
-    .pick('b');
+    .pick("b");
   type Picked = s.infer<typeof Picked>;
   assertEqualType<Picked, { b?: string }>(true);
 });
@@ -222,9 +223,11 @@ test("setKey", () => {
 });
 
 test("strictcreate", async () => {
-  const strictObj = s.object({
-    name: s.string(),
-  }).strict();
+  const strictObj = s
+    .object({
+      name: s.string(),
+    })
+    .strict();
 
   const syncResult = strictObj.safeParse({ name: "asdf", unexpected: 13 });
   expect(syncResult.success).toEqual(false);
@@ -244,7 +247,7 @@ test("constructor key", () => {
     person.parse({
       name: "bob dylan",
       constructor: 61,
-    })
+    }),
   ).toThrow();
 });
 
@@ -288,10 +291,11 @@ test("extend() should have power to override existing key", () => {
   });
   type PersonWithNumberAsLastName = s.infer<typeof PersonWithNumberAsLastName>;
 
-  const expected = { firstName: "f", lastName: 42, nickName: 'asd' };
-  const actual = PersonWithNumberAsLastName.parse(expected)
+  const expected = { firstName: "f", lastName: 42, nickName: "asd" };
+  const parseResult = PersonWithNumberAsLastName.safeParse(expected);
 
-  expect(actual).toEqual(expected);
+  expect(parseResult.success).toBe(true);
+  expect(parseResult.data).toEqual(expected);
   assertEqualType<
     PersonWithNumberAsLastName,
     { firstName: string; lastName: number }
@@ -307,82 +311,88 @@ test("passthrough index signature", () => {
   assertEqualType<{ a: string } & { [k: string]: unknown }, b>(true);
 });
 
-test('[json schema] dependant requirements', () => {
-  const Test1 = s.object({
-    name: s.string(),
-    credit_card: s.number(),
-    billing_address: s.string(),
-  }).requiredFor('name').dependentRequired({
-    credit_card: ['billing_address'],
-  })
+test("[json schema] dependant requirements", () => {
+  const Test1 = s
+    .object({
+      name: s.string(),
+      credit_card: s.number(),
+      billing_address: s.string(),
+    })
+    .requiredFor("name")
+    .dependentRequired({
+      credit_card: ["billing_address"],
+    });
 
-  expect(Test1.schema).toMatchObject(
+  expect(Test1.schema).toMatchObject({
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      credit_card: { type: "number" },
+      billing_address: { type: "string" },
+    },
+    required: ["name"],
+    dependentRequired: {
+      credit_card: ["billing_address"],
+    },
+  });
+
+  type Result = s.infer<typeof Test1>;
+  assertEqualType<
+    Result,
     {
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "credit_card": { "type": "number" },
-        "billing_address": { "type": "string" }
-      },
-      "required": ["name"],
-      "dependentRequired": {
-        "credit_card": ["billing_address"]
-      }
+      credit_card?: number | undefined;
+      name: string;
+      billing_address: string;
     }
-  );
+  >(true);
 
-  type Result = s.infer<typeof Test1>
-  assertEqualType<Result, {
-    credit_card?: number | undefined;
-    name: string;
-    billing_address: string;
-  }>(true)
+  const Test2 = s
+    .object({
+      name: s.string(),
+      credit_card: s.number(),
+      billing_address: s.string(),
+    })
+    .requiredFor("name")
+    .dependentRequired({
+      credit_card: ["billing_address"],
+      billing_address: ["credit_card"],
+    });
 
-  const Test2 = s.object({
-    name: s.string(),
-    credit_card: s.number(),
-    billing_address: s.string(),
-  }).requiredFor('name').dependentRequired({
-    credit_card: ["billing_address"],
-    billing_address: ["credit_card"]
-  })
+  expect(Test2.schema).toMatchObject({
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      credit_card: { type: "number" },
+      billing_address: { type: "string" },
+    },
+    required: ["name"],
+    dependentRequired: {
+      credit_card: ["billing_address"],
+      billing_address: ["credit_card"],
+    },
+  });
+});
 
-  expect(Test2.schema).toMatchObject(
-    {
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "credit_card": { "type": "number" },
-        "billing_address": { "type": "string" }
-      },
-      "required": ["name"],
-      "dependentRequired": {
-        "credit_card": ["billing_address"],
-        "billing_address": ["credit_card"]
-      }
-    }
-  )
-})
+test("optional properties", () => {
+  const Test = s
+    .object({
+      qwe: s.string(),
+    })
+    .rest(s.number());
+  type T = s.infer<typeof Test>;
 
-test('optional properties', () => {
-  const Test = s.object({
-    qwe: s.string(),
-  }).rest(s.number())
-  type T = s.infer<typeof Test>
+  assertType<T>({
+    qwe: 'qwe',
+    zxc: 1,
+  } as never);
+});
 
-  assertEqualType<T, {
-    [x: string]: number;
-  } & {
-    qwe: string;
-  }>(true)
-})
-
-test('object accepts type as generic', () => {
+test("object accepts type as generic", () => {
   type MyObj = {
     age: number;
     name: string;
-  }
-  const Schema = s.object<MyObj>()
+  };
+  const Schema = s.object<MyObj>();
 
-  assertEqualType<MyObj, s.infer<typeof Schema>>(true)
-})
+  assertEqualType<MyObj, s.infer<typeof Schema>>(true);
+});

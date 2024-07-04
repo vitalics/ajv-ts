@@ -1,7 +1,6 @@
-import { expect, test } from 'bun:test'
+import { expect, test, assertType } from 'vitest'
 
-import { s } from '../src'
-import { assertEqualType } from '../src/utils'
+import { array, infer, number, object, s, SchemaBuilder, string } from '../src'
 
 const empty = s.array()
 const minTwo = s.array(s.string()).minLength(2);
@@ -11,17 +10,54 @@ const intNum = s.array(s.string()).nonEmpty();
 const nonEmptyMax = s.array(s.string()).nonEmpty().maxLength(2);
 const nonEmpty = s.array(s.string()).nonEmpty();
 
-type t0 = s.infer<typeof empty>
-assertEqualType<unknown[], t0>(true)
 
-type t1 = s.infer<typeof nonEmptyMax>;
-assertEqualType<[string, ...string[]], t1>(true);
+test('types', () => {
+  type t0 = s.infer<typeof empty>
+  assertType<t0>([])
 
-type t2 = s.infer<typeof minTwo>;
-assertEqualType<[string, string, ...string[]], t2>(true);
+  type t1 = s.infer<typeof nonEmptyMax>;
+  type A= typeof nonEmptyMax
 
-type t3 = s.infer<typeof nonEmpty>
-assertEqualType<[string, ...string[]], t3>(true);
+  assertType<t1>(['string', 'sd']);
+
+  // @ts-expect-error numbers are not acepted
+  assertType<t1>(['string', 'sd', 123]);
+
+  type t2 = s.infer<typeof minTwo>;
+
+
+  // @ts-expect-error only 2 or more items
+  assertType<t2>(['qwe']);
+
+  assertType<t2>(['qwe', 'zxc']);
+
+  type t3 = s.infer<typeof nonEmpty>
+  assertType<t3>(['qwe', 'asd', 'zxcs']);
+
+  type t4 = s.infer<typeof maxTwo>;
+  // less items allowed
+  assertType<t4>(['1'])
+  assertType<t4>(['1', '2'])
+  // @ts-expect-error only 2 items allowed
+  assertType<t4>(['1', '2', '3'])
+
+  // @ts-expect-error minLength !== length
+  s.array().minLength(2).length(3)
+
+  type t5 = s.infer<typeof justTwo>
+  assertType<t5>(['asd', 'zxc'])
+  // @ts-expect-error expect exact 2 length
+  assertType<t5>(['only 1'])
+  // @ts-expect-error expect exact 2 length
+  assertType<t5>(['only 1', 'asd', 'zxc'])
+})
+
+test('create invalid schema', () => {
+  // @ts-expect-error error here
+  s.array().minLength(2).maxLength(1)
+  // @ts-expect-error negative
+  expect(() => s.array().length(-2)).toThrow(TypeError)
+})
 
 test("passing validations", () => {
   expect(minTwo.schema).toMatchObject({
@@ -58,14 +94,14 @@ test('invariant for array schema', () => {
 
   type Str = s.infer<typeof str>
 
-  assertEqualType<Str, string[]>(true)
-  assertEqualType<Obj, { qwe?: string, num: number }[]>(true)
+  assertType<Str>([''])
+  assertType<Obj>([{ qwe: 'qwe', num: 123 }, { num: 456 }])
 })
 
 test('addItems should append the schema for array', () => {
   const str = empty.addItems(s.string())
   type T = s.infer<typeof str>;
-  assertEqualType<T, [...unknown[], string]>(true)
+  assertType<T>(['asd', 123, 'a'])
   expect(str.schema).toMatchObject({
     type: 'array',
     minItems: 0,
@@ -107,7 +143,7 @@ test('addItems should replace items=false value', () => {
 
 test('element should returns SchemaBuilder instance', () => {
   const elemSchema = nonEmpty.element
-  assertEqualType<s.infer<typeof elemSchema>, string>(true)
+  assertType<s.infer<typeof elemSchema>>('asd')
   expect(elemSchema).toBeInstanceOf(s.SchemaBuilder)
   expect(elemSchema.schema).toMatchObject({
     type: 'string'

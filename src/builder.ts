@@ -15,15 +15,17 @@ import type {
   ObjectSchema,
   StringSchema,
 } from "./schema/types";
-import { Create, MakeReadonly } from "./types/array";
+import { Create, MakeReadonly, Optional, Push } from "./types/array";
 import type {
+  Fn,
   Object as ObjectTypes,
   UnionToIntersection,
   UnionToTuple,
 } from "./types/index";
-import type { GreaterThan, IsPositiveInteger } from "./types/number";
-import type { OmitByValue, OmitMany, PickMany } from "./types/object";
-import type { Email } from "./types/string";
+import type { GreaterThan, GreaterThanOrEqual, IsPositiveInteger, LessThan } from "./types/number";
+import type { OmitByValue, OmitMany, PickMany, Prettify } from "./types/object";
+import type { Email, UUID } from "./types/string";
+import type { TRangeGenericError, TTypeGenericError } from './types/errors';
 
 /**
  * Default Ajv instance.
@@ -44,7 +46,8 @@ export const DEFAULT_AJV = ajvErrors(
 );
 
 /** Any schema builder. */
-type AnySchemaBuilder =
+export type AnySchemaBuilder =
+  | SchemaBuilder<any, any, any, any>
   | NumberSchemaBuilder
   | StringSchemaBuilder
   | BooleanSchemaBuilder
@@ -60,31 +63,55 @@ type AnySchemaBuilder =
   | UnknownSchemaBuilder<unknown>
   | NotSchemaBuilder;
 
-type MetaObject = PickMany<
+export type MetaObject = PickMany<
   BaseSchema,
   ["title", "description", "deprecated", "$id", "$async", "$ref", "$schema"]
 >;
 
 export type SafeParseResult<T> =
   | SafeParseSuccessResult<T>
-  | SafeParseErrorResult;
+  | SafeParseErrorResult<T>;
 
 export type SafeParseSuccessResult<T> = {
   success: true;
   data: T;
   input: unknown;
+  /** `undefined` for success result */
   error?: Error;
 };
-export type SafeParseErrorResult = {
+export type SafeParseErrorResult<T> = {
   success: false;
   error: Error;
   input: unknown;
+  /** `undefined` for error result */
+  data?: T;
 };
 
-export abstract class SchemaBuilder<
+export type ErrorMessageParams<T extends AnySchemaBuilder> = {
+  /** Error message for not expected type. E.g. schema define string, but got number */
+  type?: string;
+  /** Error message for `required` property. E.g. schema define required property, but in actial result this property missing. */
+  required?: T extends ObjectSchemaBuilder
+  ? { [K in keyof Infer<T>]?: string } | string
+  : string;
+  /** Error message for properties. Mostly works for object, arrays */
+  properties?: T extends ObjectSchemaBuilder
+  ? { [K in keyof Infer<T>]?: string } | string
+  : string;
+  /** Error message for additional properties. Mostly works for object, arrays */
+  additionalProperties?: string;
+  /** Default or unmapped error message */
+  _?: string;
+};
+export type SchemaBuilderOpts = {
+  _preProcesses: Fn<any, any, any>[]
+  _postProcesses: Fn<any, any, any>[]
+}
+export class SchemaBuilder<
   Input = unknown,
   Schema extends AnySchemaOrAnnotation = AnySchemaOrAnnotation,
   Output = Input,
+  Opts extends SchemaBuilderOpts = { _preProcesses: [], _postProcesses: [] }
 > {
   /**
    * type helper. Do Not Use!
@@ -95,9 +122,10 @@ export abstract class SchemaBuilder<
    * type helper. Do Not Use!
    */
   _output!: Output;
-
   private _schema: Schema;
   private _shape: Schema;
+  _preProcesses!: Opts['_preProcesses']
+  _postProcesses!: Opts['_postProcesses']
 
   /**
    * returns JSON-schema representation
@@ -174,7 +202,7 @@ export abstract class SchemaBuilder<
    *  "required": ["foo"]
    *  }).custom('then', { "required": ["bar"] })
    */
-  custom<V = unknown, Result extends SchemaBuilder = this>(
+  custom<V = unknown, Result extends AnySchemaBuilder = this>(
     key: string,
     value: V,
   ): Result {
@@ -217,9 +245,9 @@ export abstract class SchemaBuilder<
    * pre process function for incoming result. Transform input **BEFORE** calling `parse`, `safeParse`, `validate` functions
    *
    * **NOTE:** this functions works BEFORE parsing. use it at own risk. (e.g. transform Date object into string)
-   * @see {@link SchemaBuilder.parse parse method}
-   * @see {@link SchemaBuilder.safeParse safe parse method}
-   * @see {@link SchemaBuilder.validate validate method}
+   * @see {@link SchemaBuilder.parse parse} method
+   * @see {@link SchemaBuilder.safeParse safe parse} method 
+   * @see {@link SchemaBuilder.validate validate} method
    * @example
    * const myString = s.string().preprocess(v => {
    *   // if date => transform to ISO string
@@ -233,14 +261,18 @@ export abstract class SchemaBuilder<
    * const res = myString.parse('qwe') // 'qwe'
    * const res = myString.parse({}) // error: not a string
    */
-  preprocess(fn: (x: unknown) => unknown) {
+  preprocess<
+    const In,
+    const Out,
+    const F extends Fn<any, any>,
+  >(fn: F): this {
     if (typeof fn !== "function") {
       throw new TypeError(`Cannot use not a function for pre processing.`, {
         cause: { type: typeof fn, value: fn },
       });
     }
     this.preFns.push(fn);
-    return this;
+    return this as never;
   }
 
   private postFns: { fn: Function; schema: AnySchemaBuilder }[] = [];
@@ -250,10 +282,10 @@ export abstract class SchemaBuilder<
    * **NOTE:** this function override your `input` variable for `safeParse` calling.
    * @see {@link SchemaBuilder.safeParse safeParse method}
    */
-  postprocess<S extends AnySchemaBuilder = AnySchemaBuilder>(
-    fn: (input: Input) => unknown,
+  postprocess<const Out, S extends AnySchemaBuilder = AnySchemaBuilder>(
+    fn: Fn<Out, [input: Output, schema: this]>,
     schema: S,
-  ): S {
+  ): this {
     if (typeof fn !== "function") {
       throw new TypeError(`Cannot use not a function for pre processing.`, {
         cause: { type: typeof fn, value: fn },
@@ -323,14 +355,16 @@ export abstract class SchemaBuilder<
     return this;
   }
   /**
-   * Defines custom error message for any error.
+   * Defines custom error message for invalid schema.
    *
-   * Error object uses {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause `cause`} property
-   *
-   * Set `schema.errorMessage = message`
+   * Set `schema.errorMessage = message` under the hood.
+   * @example
+   * // number example
+   * const numberSchema = s.number().error('Not a number')
+   * numberSchema.parse('qwe') // error: Not a number
    */
-  error(message: string) {
-    (this.schema as AnySchema).errorMessage = message;
+  error(messageOrOptions: string | ErrorMessageParams<this>) {
+    (this.schema as AnySchema).errorMessage = messageOrOptions;
     return this;
   }
 
@@ -371,7 +405,7 @@ export abstract class SchemaBuilder<
    *
    * @see {@link array}
    */
-  array(): ArraySchemaBuilder<Infer<this>, InferArray<this[]>> {
+  array<El = Infer<this>>(): ArraySchemaBuilder<El, El[], this, {maxLength: undefined, minLength: undefined, prefix: []}> {
     return array(this) as never;
   }
 
@@ -389,7 +423,7 @@ export abstract class SchemaBuilder<
   and<
     S extends AnySchemaBuilder[] = AnySchemaBuilder[],
     Arr extends AnySchemaBuilder[] = [this, ...S],
-    // @ts-ignore - IntersectionSchemaBuilder circular return itself 2577
+  // @ts-ignore - IntersectionSchemaBuilder circular return itself 2577
   >(...others: S): IntersectionSchemaBuilder<Arr> {
     return and(this, ...others) as never;
   }
@@ -425,21 +459,21 @@ export abstract class SchemaBuilder<
    * type Res = s.infer<typeof res> // 'Martin'
    */
   exclude<
-    S extends AnySchemaBuilder = AnySchemaBuilder,
-    Excl = Exclude<this["_output"], S["_output"]>,
+    S extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>,
+    Excl = Exclude<this["_output"], S['_output']>,
     This = this extends StringSchemaBuilder<infer S>
-      ? StringSchemaBuilder<Excl extends string ? Excl : S>
-      : this extends NumberSchemaBuilder<infer N>
-        ? NumberSchemaBuilder<Excl extends number ? Excl : N>
-        : this extends BooleanSchemaBuilder<infer B>
-          ? BooleanSchemaBuilder<Excl extends boolean ? Excl : B>
-          : this extends ArraySchemaBuilder<infer E>
-            ? ArraySchemaBuilder<Exclude<E, S["_output"]>>
-            : this extends ObjectSchemaBuilder<
-                  infer Def extends ObjectDefinition
-                >
-              ? ObjectSchemaBuilder<OmitByValue<Def, S>>
-              : this,
+    ? StringSchemaBuilder<Excl extends string ? Excl : S>
+    : this extends NumberSchemaBuilder<infer N>
+    ? NumberSchemaBuilder<Excl extends number ? Excl : N>
+    : this extends BooleanSchemaBuilder<infer B>
+    ? BooleanSchemaBuilder<Excl extends boolean ? Excl : B>
+    : this extends ArraySchemaBuilder<infer E>
+    ? ArraySchemaBuilder<Exclude<E, S["_output"]>>
+    : this extends ObjectSchemaBuilder<
+      infer Def extends ObjectDefinition
+    >
+    ? ObjectSchemaBuilder<OmitByValue<Def, S>>
+    : this,
   >(s: S): This {
     (this.schema as AnySchema).not = s.schema;
     return this as never;
@@ -487,10 +521,10 @@ export abstract class SchemaBuilder<
               success: true,
             };
             if (typeof el === "function") {
-              fnTransform = el(prevResult.data);
+              fnTransform = el(prevResult.data, this);
               result.data = fnTransform;
             } else {
-              fnTransform = el.fn(prevResult.data);
+              fnTransform = el.fn(prevResult.data, this);
               result = el.schema.safeParse(fnTransform);
             }
             return result;
@@ -511,36 +545,31 @@ export abstract class SchemaBuilder<
   }
 
   private _safeParseRaw(input?: unknown): SafeParseResult<unknown> {
+    let success = false;
     try {
-      const valid: boolean = this.ajv.validate(this.schema, input);
-      if (!valid) {
-        const firstError = this.ajv.errors?.at(0);
+      const validateFn = this.ajv.compile(this.schema);
+      success = validateFn(input);
+      if (!success) {
+        const firstError = validateFn.errors?.at(0);
         return {
           error: new Error(firstError?.message, {
-            cause: {
-              error: firstError,
-              debug: {
-                input,
-                errors: this.ajv.errors,
-                schema: this.schema,
-              },
-            },
+            cause: validateFn.errors,
           }),
-          success: false,
-          input: input,
+          success,
+          input,
         };
       }
     } catch (e) {
       return {
         error: new Error((e as Error).message, { cause: e }),
-        success: false,
+        success: success as false,
         input,
       };
     }
     return {
       input,
       data: input,
-      success: true,
+      success,
     };
   }
 
@@ -549,19 +578,20 @@ export abstract class SchemaBuilder<
    *
    * It also applies your `postProcess` functions if parsing was successfull
    */
-  safeParse(input?: unknown): SafeParseResult<Output> {
+  safeParse<const I>(input?: I): SafeParseResult<Output> {
     // need to remove schema, or we get precompiled result. It's bad for `extend` and `merge` in object schema
-    this.ajv.removeSchema(this.schema);
+    // TODO: investigate merge and add in ajv
+    // this.ajv.removeSchema(this.schema);
     let preTransformedResult = this._transform(input, this.preFns);
     preTransformedResult.input = input;
     if (!preTransformedResult.success) {
-      return preTransformedResult;
+      return preTransformedResult as never;
     }
 
     const parseResult = this._safeParseRaw(preTransformedResult.data);
     parseResult.input = input;
     if (!parseResult.success) {
-      return parseResult;
+      return parseResult as never;
     }
 
     const postTransformedResult = this._transform<Output>(
@@ -624,16 +654,23 @@ export abstract class SchemaBuilder<
    * @returns {Output} parsed output result.
    * @throws `Error` when input not match given schema
    */
-  parse(input?: unknown): Output {
+  parse<
+    const I,
+  >(input?: I): Output {
     const result = this.safeParse(input);
     if (!result.success) {
       throw result.error;
     }
-    return result.data;
+    return result.data as never;
   }
 }
+
 class NumberSchemaBuilder<
   const N extends number = number,
+  Opts extends SchemaBuilderOpts = {
+    _preProcesses: [],
+    _postProcesses: [],
+  }
 > extends SchemaBuilder<number, NumberSchema, N> {
   constructor() {
     super({ type: "number" });
@@ -838,9 +875,21 @@ function integer() {
   return new NumberSchemaBuilder().integer();
 }
 
+export type StringBuilderOpts = {
+  minLength?: number
+  maxLength?: number,
+}
 class StringSchemaBuilder<
   const S extends string = string,
-> extends SchemaBuilder<string, StringSchema, S> {
+  Opts extends StringBuilderOpts & SchemaBuilderOpts = {
+    minLength: undefined,
+    maxLength: undefined,
+    _preProcesses: [],
+    _postProcesses: [],
+  },
+> extends SchemaBuilder<string, StringSchema, S, Opts> {
+  /** DO not use. This is typescript type */
+  _opts!: Opts
   /**
    * The `pattern` use regular expressions to express constraints.
    * The regular expression syntax used is from JavaScript ({@link https://www.ecma-international.org/publications-and-standards/standards/ecma-262/ ECMA 262}, specifically).
@@ -880,7 +929,7 @@ class StringSchemaBuilder<
    */
   pattern<Pattern extends string = string>(
     pattern: string,
-  ): StringSchemaBuilder<Pattern> {
+  ): StringSchemaBuilder<Pattern, Opts> {
     this.schema.pattern = pattern;
     return this as never;
   }
@@ -889,7 +938,7 @@ class StringSchemaBuilder<
     super({ type: "string" });
   }
 
-  const<V extends string>(value: V): StringSchemaBuilder<V> {
+  const<V extends string>(value: V): StringSchemaBuilder<V, Opts> {
     this.schema.const = value;
     return this as never;
   }
@@ -900,17 +949,21 @@ class StringSchemaBuilder<
    * Same as `min`
    * @see {@link StringSchemaBuilder.min min}
    */
-  minLength<L extends number, Valid = IsPositiveInteger<L>>(
+  minLength<
+    const L extends number,
+    Valid = IsPositiveInteger<L>,
+    MinLengthValid extends boolean = GreaterThan<L, Opts['maxLength'] extends number ? Opts['maxLength'] : number>
+  >(
     value: Valid extends true
+      ? MinLengthValid extends true
       ? L
-      : [
-          never,
-          "Type Error. Only Positive and non floating numbers are supported.",
-          `Received: '${L}'`,
-        ],
-  ) {
+      : TRangeGenericError<`MinLength are greater than MaxLength. MinLength: ${L}. MaxLength: ${Opts['maxLength']}`>
+      : TTypeGenericError<
+        `Only Positive and non floating numbers are supported. Received: '${L}'`
+      >
+  ): StringSchemaBuilder<S, { minLength: L, maxLength: Opts['maxLength'], _preProcesses: Opts['_preProcesses'], _postProcesses: Opts['_postProcesses'] }> {
     this.schema.minLength = value as L;
-    return this;
+    return this as never;
   }
   /**
    * Define minimum string length.
@@ -926,17 +979,17 @@ class StringSchemaBuilder<
    * Same as `max`
    * @see {@link StringSchemaBuilder.max max}
    */
-  maxLength<L extends number, Valid = IsPositiveInteger<L>>(
-    value: Valid extends true
-      ? L
-      : [
-          never,
-          "Type Error. Only Positive and non floating numbers are supported.",
-          `Received: '${L}'`,
-        ],
-  ) {
+  maxLength<
+    const L extends number,
+    Valid = IsPositiveInteger<L>,
+    MinLengthValid = LessThan<Opts['minLength'] extends number ? Opts['minLength'] : number, L>>(
+      value: Valid extends true
+        ? MinLengthValid extends true ? L
+        : TRangeGenericError<`MinLength are greater than MaxLength. MinLength: ${Opts['minLength']}. MaxLength: ${L}`>
+        : TTypeGenericError<`Expected positive integer. Received: '${L}'`>,
+    ): StringSchemaBuilder<S, { maxLength: L, minLength: Opts['minLength'], _preProcesses: Opts['_preProcesses'], _postProcesses: Opts['_postProcesses'] }> {
     this.schema.maxLength = value as L;
-    return this;
+    return this as never;
   }
   /**
    * Define maximum string length.
@@ -959,22 +1012,22 @@ class StringSchemaBuilder<
    * exactStr.parse('qwer') // Error
    * exactStr.parse('go') // Error
    */
-  length<L extends number, Valid = IsPositiveInteger<L>>(
-    value: Valid extends true
-      ? L
-      : [
-          never,
-          "Type Error. Only Positive and non floating numbers are supported.",
-          `Received: '${L}'`,
-        ],
-  ) {
-    return this.maxLength(value).minLength(value);
+  length<
+    const L extends number,
+    Valid = IsPositiveInteger<L>>(
+      value: Valid extends true
+        ? L
+        : TTypeGenericError<
+          `Expected positive integer. Received: '${L}'`
+        >,
+    ): StringSchemaBuilder<S, { minLength: L, maxLength: L, _postProcesses: Opts['_postProcesses'], _preProcesses: Opts['_preProcesses'] }> {
+    return this.maxLength(value as never).minLength(value as never) as never;
   }
   /**
    * Define non empty string. Same as `minLength(1)`
    */
-  nonEmpty() {
-    return this.minLength(1);
+  nonEmpty(): StringSchemaBuilder<S, { minLength: 1, maxLength: Opts['maxLength'], _preProcesses: Opts['_preProcesses'], _postProcesses: Opts['_postProcesses'] }> {
+    return this.minLength(1 as never);
   }
 
   /**
@@ -1011,8 +1064,21 @@ class StringSchemaBuilder<
    *
    * Example: `3e4666bf-d5e5-4aa7-b8ce-cefe41c7568a`
    */
-  uuid() {
-    return this.format("uuid");
+  uuid(): OmitMany<
+    StringSchemaBuilder<UUID>,
+    [
+      "format",
+      "ipv4",
+      "ipv6",
+      "time",
+      "date",
+      "dateTime",
+      "regex",
+      "uuid",
+      "email",
+    ]
+  > {
+    return this.format("uuid") as never;
   }
   /**
    * A string is valid against this format if it represents a time in the following format: `hh:mm:ss.sTZD`.
@@ -1059,6 +1125,18 @@ class StringSchemaBuilder<
     this.schema.format = formatType;
     return this;
   }
+  // override parse<
+  //   const I extends string,
+  //   Matches = I extends S ? true : false,
+  //   ValidMinLength = GreaterThanOrEqual<StringLength<I>, Opts['minLength'] extends number ? Opts['minLength'] : number>
+  // >(input?: Matches extends true ?
+  //   ValidMinLength extends true
+  //   ? I
+  //   : TRangeGenericError<`Incoming parameter not matches MinLength requirement. Got '${I}'. MinLength: ${Opts['minLength']}`>
+  //   : TTypeGenericError<`Incoming type '${I}' not mathes to expected '${S}'`>
+  // ): S {
+  //   return super.parse(input) as never
+  // }
 }
 
 /**
@@ -1091,7 +1169,7 @@ function nil() {
   return new NullSchemaBuilder();
 }
 
-type ObjectDefinition = { [key: string]: SchemaBuilder };
+export type ObjectDefinition = { [key: string]: SchemaBuilder };
 type Merge<F, S> = Omit<F, keyof S> & S;
 class ObjectSchemaBuilder<
   Definition extends ObjectDefinition = ObjectDefinition,
@@ -1217,8 +1295,8 @@ class ObjectSchemaBuilder<
     ObjectTypes.OptionalByKey<
       T,
       ObjectTypes.InferKeys<Deps> extends keyof T
-        ? ObjectTypes.InferKeys<Deps>
-        : keyof T
+      ? ObjectTypes.InferKeys<Deps>
+      : keyof T
     >
   > {
     this.schema.dependentRequired = dependencies as never;
@@ -1317,17 +1395,19 @@ class ObjectSchemaBuilder<
   extend<ObjDef extends ObjectDefinition = ObjectDefinition>(
     def: ObjDef,
   ): ObjectSchemaBuilder<Merge<Definition, ObjDef>> {
-    if (!this.schema.properties || typeof this.schema.properties !== "object") {
-      this.schema.properties = {};
-    }
+    const a = object();
+    a.schema = Object.assign({}, this.schema);
     Object.entries(def).forEach(([key, def]) => {
-      this.schema.properties![key] = def.schema;
+      a.schema.properties![key] = def.schema;
     });
-    return this as never;
+    return a as never;
   }
 
   /**
    * Mark object as `readOnly`. It mostly decoration for typescript.
+   * 
+   * Set `schema.readOnly=true`.
+   * @see {@link https://json-schema.org/draft-07/json-schema-validation#rfc.section.10.3 JSON-schema - readOnly keyword}
    */
   readonly(): ObjectSchemaBuilder<Definition, Readonly<T>> {
     this.schema.readOnly = true;
@@ -1345,7 +1425,7 @@ class ObjectSchemaBuilder<
    * ingredients: z.array(z.string()),
    * });
    * const JustTheNameAndId = Recipe.pick('name', 'id');
-   * type JustTheName = z.infer<typeof JustTheNameAndId>;
+   * type JustTheName = s.infer<typeof JustTheNameAndId>;
    * // => { name: string, id: string }
    */
   pick<K extends keyof T, Keys extends K[] = K[]>(
@@ -1416,16 +1496,16 @@ class ObjectSchemaBuilder<
 function object<
   ObjType extends {
     [key: string]:
-      | string
-      | number
-      | boolean
-      | null
-      | undefined
-      | unknown[]
-      | object;
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | readonly unknown[]
+    | object;
   } = {},
   Definitions extends ObjectDefinition = {
-    [K in keyof ObjType]: MatchTypeToBuilder<ObjType[K]>;
+    [K in keyof ObjType]: MatchTypeToBuilder<ObjType[K]> extends SchemaBuilder ? MatchTypeToBuilder<ObjType[K]> : never;
   },
 >(def?: Definitions) {
   return new ObjectSchemaBuilder<Definitions>(def);
@@ -1455,12 +1535,18 @@ function record<Def extends AnySchemaBuilder>(valueDef?: Def) {
   return new RecordSchemaBuilder<Def>(valueDef);
 }
 
+export type ArrayShemaOpts = {
+  minLength?: number,
+  maxLength?: number,
+  prefix?: any[],
+}
+type GetArrayOrEmpty<T> = T extends readonly unknown[] ? T : []
 class ArraySchemaBuilder<
   El = undefined,
   Arr extends readonly unknown[] = El[],
   S extends AnySchemaBuilder = SchemaBuilder<El, any, El>,
-  Prefix extends readonly unknown[] = [],
-> extends SchemaBuilder<Arr, ArraySchema, [...Prefix, ...Arr]> {
+  Opts extends ArrayShemaOpts = { prefix: [], minLength: undefined, maxLength: undefined }
+> extends SchemaBuilder<Arr, ArraySchema, [...GetArrayOrEmpty<Opts['prefix']>, ...Arr]> {
   constructor(definition?: S) {
     super({ type: "array", items: definition?.schema ?? {}, minItems: 0 });
   }
@@ -1470,7 +1556,7 @@ class ArraySchemaBuilder<
    *
    * Set in JSON schema `unevaluatedItems=false`.
    */
-  readonly(): ArraySchemaBuilder<El, MakeReadonly<Arr>, S, Prefix> {
+  readonly(): ArraySchemaBuilder<El, MakeReadonly<Arr>, S, Opts> {
     this.schema.unevaluatedItems = false;
     return this;
   }
@@ -1482,7 +1568,11 @@ class ArraySchemaBuilder<
    */
   prefix<Pref extends AnySchemaBuilder[]>(
     ...definitions: Pref
-  ): ArraySchemaBuilder<El, [element: El], S, InferArray<Pref>> {
+  ): ArraySchemaBuilder<El, [element: El], S, {
+    prefix: InferArray<Pref>,
+    maxLength: Opts['maxLength'],
+    minLength: Opts['minLength']
+  }> {
     this.schema.prefixItems = definitions.map((def) => def.schema);
     return this as never;
   }
@@ -1510,7 +1600,7 @@ class ArraySchemaBuilder<
     El | Infer<Schema>,
     [...Arr, ...InferArray<Schemas>],
     S,
-    Prefix
+    Opts
   > {
     if (Array.isArray(this.schema.items)) {
       this.schema.items.push(...s.map((el) => el.schema));
@@ -1540,18 +1630,55 @@ class ArraySchemaBuilder<
    * arr.parse([1]) // OK
    * arr.parse([1, 2, 3, 4]) // Error
    */
-  maxLength<L extends number, Valid = IsPositiveInteger<L>>(
-    value: Valid extends true
-      ? L
-      : [
-          never,
-          "Type Error. Only Positive and non floating numbers are supported.",
-          `Received: '${L}'`,
-        ],
-  ) {
+  maxLength<
+    const L extends number,
+    Valid = IsPositiveInteger<L>,
+    IsValidByMaxLength = Opts['minLength'] extends number ? GreaterThan<L, Opts['minLength']> : true
+  >(
+    value: Valid extends false ? TTypeGenericError<`Only Positive and non floating numbers are supported. Received: '${L}'`>
+      : IsValidByMaxLength extends false ? TRangeGenericError<'MaxLength less than MinLength', [
+        `MinLength: ${Opts['minLength']}`,
+        `MaxLength: ${L}`
+      ]>
+      : L,
+  ): ArraySchemaBuilder<El, Optional<Create<L, El>>, S, { maxLength: L, minLength: Opts['minLength'], prefix: Opts['prefix'] }> {
     this.schema.maxItems = value as L;
-    return this;
+    return this as never;
   }
+  /**
+ * Must contain more items or equal than declared
+ *
+ * @see {@link ArraySchemaBuilder.length length}
+ * @see {@link ArraySchemaBuilder.maxLength maxLength}
+ * @example
+ * const arr = s.array(s.number()).minLength(3)
+ * arr.parse([1, 2, 3]) // OK
+ * arr.parse([1]) // Error
+ * arr.parse([1, 2, 3, 4]) // OK
+ */
+  minLength<
+    const L extends number,
+    IsValidByMaxLength = Opts['maxLength'] extends undefined ? true : Opts['maxLength'] extends number ? LessThan<L, Opts['maxLength']> : true,
+  >(
+    value: IsPositiveInteger<L> extends false ? TTypeGenericError<
+      `MinLength should be positive integer. Received: '${L}'`, [L]
+    > : IsValidByMaxLength extends false ? TRangeGenericError<
+      `MaxLength is less than minLength.`,
+      [
+        `MinLength: ${L}`,
+        `MaxLength: ${Opts['maxLength']}`
+      ]> : L,
+  ): ArraySchemaBuilder<El, [...Create<L, El>, ...El[]], S, { maxLength: Opts['maxLength'], minLength: L, prefix: Opts['prefix'] }> {
+    if ((value as never) < 0) {
+      throw new TypeError(
+        `Only Positive and non floating numbers are supported.`,
+      );
+    }
+
+    this.schema.minItems = value as L;
+    return this as never;
+  }
+  min = this.minLength;
 
   /**
    * Returns schema builder of the element.
@@ -1568,15 +1695,15 @@ class ArraySchemaBuilder<
   get element(): El extends Array<unknown>
     ? ArraySchemaBuilder<El[number], El>
     : El extends
-          | string
-          | number
-          | boolean
-          | object
-          | unknown[]
-          | null
-          | undefined
-      ? MatchTypeToBuilder<El>
-      : SchemaBuilder<El> {
+    | string
+    | number
+    | boolean
+    | object
+    | unknown[]
+    | null
+    | undefined
+    ? MatchTypeToBuilder<El>
+    : SchemaBuilder<El> {
     const elementSchema = this.schema.items;
     if (Array.isArray(elementSchema)) {
       const builder = array<SchemaBuilder<Arr[number]>>();
@@ -1598,46 +1725,23 @@ class ArraySchemaBuilder<
    * arr.parse([1, 2, 3, 4, 5, 6]) // Error
    * arr.parse([1, 2, 3, 4]) // Error
    */
-  length<L extends number, Valid = IsPositiveInteger<L>>(
-    value: Valid extends true
+  length<L extends number,
+    Valid = IsPositiveInteger<L>,
+    OkMinLength = Opts['minLength'] extends undefined ? true : false,
+    OkMaxLength = Opts['maxLength'] extends undefined ? true : false,
+  >(
+    value: OkMaxLength extends true ?
+      OkMinLength extends true ?
+      Valid extends true
       ? L
-      : [
-          never,
-          'TypeError. "length" should be positive integer',
-          `Received: '${L}'`,
-        ],
-  ): this {
-    return this.minLength(value as number).maxLength(value as number) as never;
+      : TTypeGenericError<
+        `expected positive integer. Received: '${L}'`
+      >
+      : TRangeGenericError<`MinLength not equal to Length. MinLength: ${Opts['minLength']}. Length: ${L}`>
+      : TRangeGenericError<`MaxLength not equal to Length. MaxLength: ${Opts['maxLength']}. Length: ${L}`>,
+  ): ArraySchemaBuilder<El, Create<L, El>, S, Pick<Opts, 'prefix'> & { minLength: L, maxLength: L }> {
+    return this.minLength(value as never).maxLength(value as never) as never;
   }
-  /**
-   * Must contain more items or equal than declared
-   *
-   * @see {@link ArraySchemaBuilder.length}
-   * @see {@link ArraySchemaBuilder.maxLength}
-   * @example
-   * const arr = s.array(s.number()).minLength(3)
-   * arr.parse([1, 2, 3]) // OK
-   * arr.parse([1]) // Error
-   * arr.parse([1, 2, 3, 4]) // OK
-   */
-  minLength<const L extends number, Valid = IsPositiveInteger<L>>(
-    value: Valid extends true
-      ? L
-      : [
-          never,
-          "TypeError. minLength should be positive integer.",
-          `Received: '${L}'`,
-        ],
-  ): ArraySchemaBuilder<El, [...Create<L, El>, ...El[]], S, Prefix> {
-    if ((value as L) < 0) {
-      throw new TypeError(
-        `Only Positive and non floating numbers are supported.`,
-      );
-    }
-    this.schema.minItems = value as L;
-    return this as never;
-  }
-  min = this.minLength;
 
   /**
    * same as `s.array().minLength(1)`
@@ -1647,14 +1751,14 @@ class ArraySchemaBuilder<
     // `HasLength` shows is Arr['length'] returns number or not
     // Example: Input: string[], HasLength<number, number> = false
     // Example: Input: [string, string], HasLength<2, number> = true
-    HasLength extends boolean = GreaterThan<Arr["length"], number>,
+    HasLength = GreaterThan<Arr["length"], number>,
   >(): ArraySchemaBuilder<
     El,
     HasLength extends true ? Arr : [El, ...El[]],
     S,
-    Prefix
+    { prefix: Opts['prefix'], minLength: 1, maxLength: Opts['maxLength'] }
   > {
-    return this.minLength(1) as never;
+    return this.minLength(1 as never) as never;
   }
 
   /**
@@ -1696,10 +1800,10 @@ class ArraySchemaBuilder<
     value: Valid extends true
       ? N
       : [
-          never,
-          'TypeError: "minContains" should be positive integer',
-          `Received: '${N}'`,
-        ],
+        never,
+        'TypeError: "minContains" should be positive integer',
+        `Received: '${N}'`,
+      ],
   ) {
     this.schema.minContains = value as N;
     return this;
@@ -1717,10 +1821,10 @@ class ArraySchemaBuilder<
     value: Valid extends true
       ? N
       : [
-          never,
-          'TypeError: "maxContains" should be positive integer',
-          `Received: '${N}'`,
-        ],
+        never,
+        'TypeError: "maxContains" should be positive integer',
+        `Received: '${N}'`,
+      ],
   ) {
     this.schema.maxContains = value as N;
     return this;
@@ -1737,7 +1841,7 @@ class ArraySchemaBuilder<
  */
 function array<S extends AnySchemaBuilder = AnySchemaBuilder>(
   definition?: S,
-): ArraySchemaBuilder<Infer<S>, Infer<S>[], S, []> {
+): ArraySchemaBuilder<Infer<S>, Infer<S>[], S, { maxLength: undefined, minLength: undefined, prefix: [] }> {
   return new ArraySchemaBuilder(definition);
 }
 
@@ -1745,8 +1849,8 @@ type AssertArray<T> = T extends any[] ? T : never;
 type TupleItems = [AnySchemaBuilder, ...AnySchemaBuilder[]];
 type OutputTypeOfTuple<T extends TupleItems | []> = AssertArray<{
   [k in keyof T]: T[k] extends SchemaBuilder<any, any, any>
-    ? T[k]["_output"]
-    : never;
+  ? T[k]["_output"]
+  : never;
 }>;
 
 type OutputTypeOfTupleWithRest<
@@ -1814,7 +1918,7 @@ class EnumSchemaBuilder<
     return this._enum as never;
   }
 }
-type EnumLike = { [k: string]: string | number; [nu: number]: string };
+type EnumLike = { [k: string]: string | number;[nu: number]: string };
 
 class NativeEnumSchemaBuilder<T extends EnumLike> extends SchemaBuilder<
   T,
@@ -1892,7 +1996,7 @@ function constant<T extends number | string | boolean | null | object>(
 }
 
 class UnionSchemaBuilder<
-  S extends SchemaBuilder[] = SchemaBuilder[],
+  S extends AnySchemaBuilder[] = AnySchemaBuilder[],
 > extends SchemaBuilder<Infer<S[number]>, AnySchemaOrAnnotation> {
   constructor(...schemas: S) {
     super({
@@ -1909,9 +2013,9 @@ class IntersectionSchemaBuilder<
   S extends AnySchemaBuilder[] = SchemaBuilder[],
   Elem extends AnySchemaBuilder = S[number],
   Intersection extends
-    AnySchemaBuilder = UnionToIntersection<Elem> extends SchemaBuilder
-    ? UnionToIntersection<Elem>
-    : SchemaBuilder,
+  AnySchemaBuilder = UnionToIntersection<Elem> extends SchemaBuilder
+  ? UnionToIntersection<Elem>
+  : SchemaBuilder,
 > extends SchemaBuilder<
   Infer<Elem>,
   AnySchemaOrAnnotation,
@@ -1941,8 +2045,8 @@ type PropKey = Exclude<PropertyKey, symbol>;
 function keyof<
   ObjSchema extends ObjectSchemaBuilder,
   Res extends PropKey = keyof ObjSchema["_output"] extends PropKey
-    ? keyof ObjSchema["_output"]
-    : never,
+  ? keyof ObjSchema["_output"]
+  : never,
 >(obj: ObjSchema): UnionSchemaBuilder<ConstantSchemaBuilder<Res>[]> {
   if (!obj.schema.properties) {
     throw new Error(
@@ -2002,12 +2106,12 @@ function never() {
 class NotSchemaBuilder<
   S extends AnySchemaBuilder = SchemaBuilder<any, any, any>,
   T extends number | string | boolean | object | null | Array<unknown> =
-    | number
-    | string
-    | boolean
-    | object
-    | null
-    | Array<unknown>,
+  | number
+  | string
+  | boolean
+  | object
+  | null
+  | Array<unknown>,
   Out = Exclude<T, S["_output"]>,
 > extends SchemaBuilder<S["_output"], AnySchemaOrAnnotation, Out> {
   constructor(schema: S) {
@@ -2030,6 +2134,8 @@ class NotSchemaBuilder<
  * import s from 'ajv-ts'
  *
  * const notString = s.not(s.string())
+ * // or
+ * const notStringAlternative = s.string().not()
  *
  * notString.parse(42) // OK
  * notString.parse({key: 'value'}) // OK
@@ -2037,6 +2143,23 @@ class NotSchemaBuilder<
  */
 function not<S extends AnySchemaBuilder = AnySchemaBuilder>(def: S) {
   return new NotSchemaBuilder<S>(def);
+}
+
+/**
+ * get JSON-schema from somewhere and merge with `baseSchema`
+ * @param externalJsonSchema external schema. E.g. from swagger
+ * @param [baseSchema=any() as S] schema to use. Default is `s.any()`.
+ * @example
+ * const v = s.fromJSON({someCustomProp: true}, s.string())
+ * v.schema.someCustomProp === true
+ * v.schema.type === 'string'
+ */
+function fromJSON<const T, S extends AnySchemaBuilder>(
+  externalJsonSchema: T,
+  baseSchema: S = any() as S
+): S {
+  baseSchema.schema = { ...baseSchema.schema, ...externalJsonSchema };
+  return baseSchema;
 }
 
 function injectAjv<S extends SchemaBuilder = SchemaBuilder>(
@@ -2089,6 +2212,7 @@ function create(ajv: Ajv) {
     and: injectAjv(ajv, and) as typeof and,
     intersection: injectAjv(ajv, and) as typeof and,
     not: injectAjv(ajv, not) as typeof not,
+    fromJSON,
   };
 }
 
@@ -2119,7 +2243,18 @@ export {
   tuple,
   or as union,
   unknown,
-  type AnySchemaBuilder as AnySchema,
+  fromJSON,
+  type AnySchemaBuilder as Any,
+  type NumberSchemaBuilder as Number,
+  type StringSchemaBuilder as String,
+  type BooleanSchemaBuilder as Boolean,
+  type NullSchemaBuilder as Null,
+  type UnknownSchemaBuilder as Unknown,
+  type NeverSchemaBuilder as Never,
+  type ArraySchemaBuilder as Array,
+  type ObjectSchemaBuilder as Object,
+  type UnionSchemaBuilder as Or,
+  type IntersectionSchemaBuilder as And,
   type Infer as infer,
   type Input as input,
 };
@@ -2127,49 +2262,47 @@ export {
 /**
  * Extract schema level defenition and return it's represenation as typescript type
  */
-export type Infer<T extends SchemaBuilder<any, any, any>> = T["_output"];
+export type Infer<T extends SchemaBuilder<any, any, any, any>> = T["_output"];
 
 /** Extract SchemaBuilder[] - used in array schema to build right types */
-type InferArray<
+export type InferArray<
   T extends SchemaBuilder[],
   Result extends unknown[] = [],
 > = T extends []
   ? unknown[]
   : T extends [
-        infer First extends SchemaBuilder,
-        ...infer Rest extends SchemaBuilder[],
-      ]
-    ? Rest extends []
-      ? [...Result, Infer<First>]
-      : InferArray<Rest, [...Result, Infer<First>]>
-    : T extends Array<infer El extends SchemaBuilder>
-      ? [...Result, ...Infer<El>[]]
-      : Result;
+    infer First extends SchemaBuilder,
+    ...infer Rest extends SchemaBuilder[],
+  ]
+  ? Rest extends []
+  ? [...Result, Infer<First>]
+  : InferArray<Rest, [...Result, Infer<First>]>
+  : T extends Array<infer El extends SchemaBuilder>
+  ? [...Result, ...Infer<El>[]]
+  : Result;
 
 /** extract schema input type */
-export type Input<T extends SchemaBuilder<any, any, any>> = T["_input"];
+export type Input<T extends SchemaBuilder<any, any, any, any>> = T["_input"];
 
-type MatchTypeToBuilder<
-  T extends number | boolean | string | object | unknown[] | null | undefined,
-> = T extends boolean
+export type MatchTypeToBuilder<T> = T extends boolean
   ? BooleanSchemaBuilder<T>
   : T extends Array<infer El extends number | string | object | boolean | null>
-    ? ArraySchemaBuilder<MatchTypeToBuilder<El>[]>
-    : T extends string
-      ? StringSchemaBuilder<T>
-      : T extends number
-        ? NumberSchemaBuilder<T>
-        : T extends Record<
-              string,
-              number | boolean | string | object | unknown[] | null
-            >
-          ? { [K in keyof T]: MatchTypeToBuilder<T[K]> }
-          : T extends null
-            ? NullSchemaBuilder
-            : T extends undefined
-              ? SchemaBuilder<T | undefined, any, T | undefined>
-              : T extends unknown
-                ? UnknownSchemaBuilder<T>
-                : T extends SchemaBuilder<any, any, infer Out>
-                  ? SchemaBuilder<any, any, Out>
-                  : SchemaBuilder<any, any, any>;
+  ? ArraySchemaBuilder<MatchTypeToBuilder<El>[]>
+  : T extends string
+  ? StringSchemaBuilder<T>
+  : T extends number
+  ? NumberSchemaBuilder<T>
+  : T extends Record<
+    string,
+    number | boolean | string | object | unknown[] | null
+  >
+  ? { [K in keyof T]: MatchTypeToBuilder<T[K]> }
+  : T extends null
+  ? NullSchemaBuilder
+  : T extends undefined
+  ? SchemaBuilder<T | undefined, any, T | undefined>
+  : T extends unknown
+  ? UnknownSchemaBuilder<T>
+  : T extends SchemaBuilder<any, any, infer Out>
+  ? SchemaBuilder<any, any, Out>
+  : SchemaBuilder<any, any, any>;

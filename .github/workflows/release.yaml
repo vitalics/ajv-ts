@@ -16,14 +16,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build Packages
+  install_build_release:
+    name: Build & Release Packages
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node_version: [20]
+        pnpm_version: [9.4.0]
     steps:
-      - uses: actions/checkout@v3
-      - uses: oven-sh/setup-bun@v1
-      - run: bun install
-      - run: bun run build
+      - name: Clone repository
+        uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{matrix.pnpm_version}}
+      - name: Use Node.js ${{matrix.node_version}}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install
+      - name: Generate build
+        run: pnpm build
       - uses: changesets/action@v1
         if: ${{ github.event_name != 'pull_request' }}
         with:
