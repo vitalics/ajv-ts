@@ -1,3 +1,5 @@
+/// NOTE: experimental module
+
 import Benchmark from "benchmark";
 import s from "../src";
 
