@@ -5,32 +5,29 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "bun",
+      "name": "tsx",
+      "type": "node",
       "request": "launch",
-      "name": "Debug Bun",
-      // The path to a JavaScript or TypeScript file to run.
+      // Debug current file in VSCode
       "program": "${file}",
-      // The arguments to pass to the program, if any.
-      "args": [],
-      // The working directory of the program.
-      "cwd": "${workspaceFolder}",
-      // The environment variables to pass to the program.
-      "env": {},
-      // If the environment variables should not be inherited from the parent process.
-      "strictEnv": false,
-      // If the program should be run in watch mode.
-      // This is equivalent to passing `--watch` to the `bun` executable.
-      // You can also set this to "hot" to enable hot reloading using `--hot`.
-      "watchMode": false,
-      // If the debugger should stop on the first line of the program.
-      "stopOnEntry": false,
-      // If the debugger should be disabled. (for example, breakpoints will not be hit)
-      "noDebug": false,
-      // The path to the `bun` executable, defaults to your `PATH` environment variable.
-      "runtime": "bun",
-      // The arguments to pass to the `bun` executable, if any.
-      // Unlike `args`, these are passed to the executable itself, not the program.
-      "runtimeArgs": [],
-    },
+      /*
+       * Path to tsx binary
+       * Assuming locally installed
+       */
+      "runtimeExecutable": "tsx",
+      /*
+       * Open terminal when debugging starts (Optional)
+       * Useful to see console.logs
+       */
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      // Files to exclude from debugger (e.g. call stack)
+      "skipFiles": [
+        // Node.js internal core modules
+        "<node_internals>/**",
+        // Ignore all dependencies (optional)
+        "${workspaceFolder}/node_modules/**",
+      ],
+    }
   ]
 }

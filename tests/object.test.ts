@@ -1,4 +1,4 @@
-import { assertType, expect, test } from "vitest";
+import { assertType, expect, expectTypeOf, test } from "vitest";
 
 import { assertEqualType } from "../src/utils";
 import s from "../src";
@@ -396,3 +396,53 @@ test("object accepts type as generic", () => {
 
   assertEqualType<MyObj, s.infer<typeof Schema>>(true);
 });
+
+test('#57 merge() should not contains undefined after merge', () => {
+
+  const AjvVehicleSchema = s.object({
+    make: s.string(),
+    model: s.string(),
+    year: s.number(),
+  });
+
+  const AjvTruckSchema = s
+    .object({
+      commercialCapacity: s.number(),
+      forwardCabin: s.boolean(),
+      wheels: s.number(),
+    })
+    .merge(AjvVehicleSchema);
+
+  type AjvTruck = s.infer<typeof AjvTruckSchema>;
+
+  const resp = AjvTruckSchema.safeParse({
+    make: 'Bugatti',
+    model: 'Model T',
+    year: 2020,
+    commercialCapacity: 1000,
+    forwardCabin: true,
+    wheels: 4
+  })
+  expect(resp.success).toBe(true)
+
+  expect(AjvTruckSchema.schema).toMatchObject(
+    {
+      type: 'object',
+      properties: {
+        commercialCapacity: { type: 'number' },
+        forwardCabin: { type: 'boolean' },
+        wheels: { type: 'number' },
+        make: { type: 'string' },
+        model: { type: 'string' },
+        year: { type: 'number' },
+      }
+    })
+  assertType<AjvTruck>({
+    make: 'Bugatti',
+    model: 'Model T',
+    year: 2020,
+    commercialCapacity: 1000,
+    forwardCabin: true,
+    wheels: 4
+  })
+})
