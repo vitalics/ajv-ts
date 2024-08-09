@@ -8,7 +8,8 @@ Fixes:
 
 Chore:
 
-- Move bech under `tests` folder
+- remove benchmarks for now
+- add more detailed bug report template
 
 Infra:
 

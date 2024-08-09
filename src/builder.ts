@@ -41,7 +41,7 @@ export const DEFAULT_AJV = ajvErrors(
     new Ajv({
       allErrors: true,
       useDefaults: true,
-    }) as unknown as Ajv,
+    } as never) as unknown as Ajv,
   ) as unknown as Ajv,
 );
 

@@ -23,9 +23,25 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Desktop (please complete the following information):**
- - JS runtime (Node.js / Bun / Deno)[e.g. Bun 1.0.0]
- - Version [e.g. 0.1.1]
+**System info (please complete the following information):**
+
+- JS runtime with version(Node.js / Bun / Deno). E.g. Bun 1.0.0
+<!-- nodejs: `node -v` -->
+<!-- bun: `bun -v` -->
+<!-- deno: `deno -v` -->
+- package manager with version (Bun / npm / yarn / pnpm). E.g. Bun 1.0.0
+- Ajv-ts version
+  - from package.json
+  - from lock file (package-lock.json / yarn.lock / pnpm-lock.yaml)
+- System info
+<!-- macos. System info: `system_profiler SPHardwareDataType` -->
+<!-- macos. OS info: `sw_vers` -->
+<!-- linux. Disto info: `lsb_release -a` -->
+<!-- linux. CPU info: `lscpu` -->
+<!-- linux. General Info: `uname -a` -->
+<!-- windows. General Info: `systeminfo` -->
+<!-- windows. CPU Info: `wmic cpu get name, currentclockSpeed, maxClockSpeed
+` -->
 
 **Additional context**
 Add any other context about the problem here.
