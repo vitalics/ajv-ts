@@ -41,8 +41,8 @@ export const DEFAULT_AJV = ajvErrors(
     new Ajv({
       allErrors: true,
       useDefaults: true,
-    }) as Ajv,
-  ) as Ajv,
+    }) as unknown as Ajv,
+  ) as unknown as Ajv,
 );
 
 /** Any schema builder. */
