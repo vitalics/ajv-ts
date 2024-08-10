@@ -41,8 +41,8 @@ export const DEFAULT_AJV = ajvErrors(
     new Ajv({
       allErrors: true,
       useDefaults: true,
-    }),
-  ),
+    } as never) as never,
+  ) as never,
 );
 
 /** Any schema builder. */
@@ -405,7 +405,7 @@ export class SchemaBuilder<
    *
    * @see {@link array}
    */
-  array<El = Infer<this>>(): ArraySchemaBuilder<El, El[], this, {maxLength: undefined, minLength: undefined, prefix: []}> {
+  array<El = Infer<this>>(): ArraySchemaBuilder<El, El[], this, { maxLength: undefined, minLength: undefined, prefix: [] }> {
     return array(this) as never;
   }
 
@@ -1380,10 +1380,21 @@ class ObjectSchemaBuilder<
     Merge<Definition, Def>,
     Merge<this["_output"], ObjSchema["_output"]>
   > {
-    Object.entries(schema.schema).forEach(([key, def]) => {
-      this.schema.properties![key] = def.schema;
+    if (schema.schema.type !== 'object') {
+      throw new TypeError('Cannot merge not object type with object', {
+        cause: {
+          incoming: schema.schema,
+          given: this.schema,
+        },
+      })
+    }
+    const a = object();
+    a.schema = Object.assign({}, this.schema);
+    Object.entries(schema.def).forEach(([key, def]) => {
+      a.schema.properties![key] = def.schema;
     });
-    return this as never;
+    a.def = { ...this.def, ...schema.def }
+    return a as never;
   }
   /**
    * Same as `merge`, but not accepts `s.object`.
@@ -1400,6 +1411,7 @@ class ObjectSchemaBuilder<
     Object.entries(def).forEach(([key, def]) => {
       a.schema.properties![key] = def.schema;
     });
+    a.def = { ...this.def, ...def }
     return a as never;
   }
 
