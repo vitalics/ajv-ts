@@ -1298,8 +1298,12 @@ class ObjectSchemaBuilder<
   /**
    * Disallow additional properties for object schema `additionalProperties=false`
    *
-   * If you would like to define additional properties type - use `additionalProeprties`
+   * If you would like to define additional properties type - use `additionalProperties`
    * @see {@link ObjectSchemaBuilder.additionalProperties additionalProperties}
+   * 
+   * If you would like to mark properties required - use `required` or `requiredFor`
+   * @see {@link ObjectSchemaBuilder.required required}
+   * @see {@link ObjectSchemaBuilder.requiredFor requiredFor}
    */
   strict() {
     this.schema.additionalProperties = false;
@@ -1326,7 +1330,8 @@ class ObjectSchemaBuilder<
   /**
    * Make **ALL** properties in your object required.
    *
-   * If you need to make 1 property required - use {@link ObjectSchemaBuilder.requiredFor}
+   * If you need to make few required properties (1 or more, not everything fields) - use `requiredFor`
+   * @see {@link ObjectSchemaBuilder.requiredFor requiredFor}
    */
   required(): ObjectSchemaBuilder<Definition, Required<T>> {
     const allProperties = Object.keys(this.schema.properties!);
