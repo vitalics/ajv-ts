@@ -446,3 +446,13 @@ test('#57 merge() should not contains undefined after merge', () => {
     wheels: 4
   })
 })
+
+test('#61 optional nullable object schema should parsed successfully', () => {
+  const optionalNullableObj = s.object({
+    sex: s.enum(['male', 'female']).nullable().optional(),
+  });
+
+  expect(optionalNullableObj.parse({})).toStrictEqual({});
+  expect(optionalNullableObj.parse({ sex: 'male' })).toStrictEqual({ sex: 'male' });
+  expect(optionalNullableObj.parse({ sex: null })).toStrictEqual({ sex: null });
+})

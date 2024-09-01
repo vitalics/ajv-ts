@@ -114,3 +114,21 @@ test("from const", () => {
   expect(GreekEnum.enum.Alpha).toEqual("a");
 });
 
+test('#61 nullable enum', () => {
+  const sex = s.enum(['male', 'female']);
+  const nullableSex = s.enum(['male', 'female']).nullable();
+
+  const optionalNullableObj = s.object({
+    sex: s.enum(['male', 'female']).nullable().optional(),
+  });
+
+  expect(sex.parse('male')).toBe('male');
+  expect(sex.parse('female')).toBe('female');
+  expect(sex.validate(null)).toBe(false);
+  expect(sex.validate(undefined)).toBe(false);
+
+  expect(nullableSex.parse('male'),).toBe('male');
+  expect(nullableSex.parse('female'),).toBe('female');
+  expect(nullableSex.validate(null)).toBe(true);
+  expect(nullableSex.validate(undefined)).toBe(false);
+})

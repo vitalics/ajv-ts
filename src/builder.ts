@@ -228,15 +228,7 @@ export class SchemaBuilder<
    * schemaDef.schema // { type: ['string', 'null'], nullable: true }
    */
   nullable(): SchemaBuilder<Input, Schema, Output | null> {
-    this.isNullable = true;
-    (this.schema as any).nullable = true;
-    const type = (this.schema as any).type;
-    if (Array.isArray(type)) {
-      (this.schema as any).type = [...new Set([...type, "null"])];
-    } else {
-      (this.schema as any).type = [...new Set([type, "null"])];
-    }
-    return this as never;
+    return or(this, nil()) as never
   }
 
   private preFns: Function[] = [];
