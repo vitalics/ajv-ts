@@ -446,3 +446,31 @@ test('#57 merge() should not contains undefined after merge', () => {
     wheels: 4
   })
 })
+
+test('#61 optional nullable object schema should parsed successfully', () => {
+  const optionalNullableObj = s.object({
+    sex: s.enum(['male', 'female']).nullable().optional(),
+  });
+
+  expect(optionalNullableObj.parse({})).toStrictEqual({});
+  expect(optionalNullableObj.parse({ sex: 'male' })).toStrictEqual({ sex: 'male' });
+  expect(optionalNullableObj.parse({ sex: null })).toStrictEqual({ sex: null });
+})
+
+test('#61 should parse big schema successfully', () => {
+  const schema2 = s.object({
+    name: s.string().minLength(2).maxLength(20),
+    age: s.number().integer().min(0).max(100),
+
+    // default optional - string | null | undefined
+    email: s.string().format('email').nullable().optional().default(null),
+
+    //optional - string | null | undefined
+    phone: s.string().nullable().optional(),
+
+    // required - string | null
+    surname: s.string().nullable(),
+  }).strict();
+
+  expect(schema2.parse({ name: 'Alex', age: 10, })).toStrictEqual({ name: 'Alex', age: 10, email: null });
+})
