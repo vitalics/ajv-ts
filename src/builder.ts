@@ -65,7 +65,7 @@ export type AnySchemaBuilder =
 
 export type MetaObject = PickMany<
   BaseSchema,
-  ["title", "description", "deprecated", "$id", "$async", "$ref", "$schema"]
+  ["title", "description", "deprecated", "examples", "$id", "$async", "$ref", "$schema"]
 >;
 
 export type SafeParseResult<T> =
