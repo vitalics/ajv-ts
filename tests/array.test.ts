@@ -10,13 +10,12 @@ const intNum = s.array(s.string()).nonEmpty();
 const nonEmptyMax = s.array(s.string()).nonEmpty().maxLength(2);
 const nonEmpty = s.array(s.string()).nonEmpty();
 
-
 test('types', () => {
   type t0 = s.infer<typeof empty>
   assertType<t0>([])
 
   type t1 = s.infer<typeof nonEmptyMax>;
-  type A= typeof nonEmptyMax
+  type A = typeof nonEmptyMax
 
   assertType<t1>(['string', 'sd']);
 

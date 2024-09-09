@@ -876,6 +876,7 @@ function integer() {
 export type StringBuilderOpts = {
   minLength?: number
   maxLength?: number,
+  pattern?: string | RegExp
 }
 class StringSchemaBuilder<
   const S extends string = string,
@@ -925,10 +926,14 @@ class StringSchemaBuilder<
    * const str1 = prefixS.parse("qwe") // Error
    * const str2 = prefixS.parse("S_Some") // OK
    */
-  pattern<Pattern extends string = string>(
-    pattern: string,
-  ): StringSchemaBuilder<Pattern, Opts> {
-    this.schema.pattern = pattern;
+  pattern<const In extends string | RegExp = string | RegExp>(
+    pattern: In,
+  ): StringSchemaBuilder<S, Prettify<Opts & { pattern: In }>> {
+    if (typeof pattern === 'string') {
+      this.schema.pattern = pattern;
+    } else if (pattern instanceof RegExp) {
+      this.schema.pattern = pattern.source
+    }
     return this as never;
   }
 
@@ -950,12 +955,12 @@ class StringSchemaBuilder<
   minLength<
     const L extends number,
     Valid = IsPositiveInteger<L>,
-    MinLengthValid extends boolean = GreaterThan<L, Opts['maxLength'] extends number ? Opts['maxLength'] : number>
+    MinLengthValid = GreaterThan<L, Opts['maxLength'] extends number ? Opts['maxLength'] : number>,
   >(
     value: Valid extends true
-      ? MinLengthValid extends true
+      ? Opts['maxLength'] extends undefined
       ? L
-      : TRangeGenericError<`MinLength are greater than MaxLength. MinLength: ${L}. MaxLength: ${Opts['maxLength']}`>
+      : MinLengthValid extends true ? L : TRangeGenericError<`MinLength are greater than MaxLength. MinLength: ${L}. MaxLength: ${Opts['maxLength']}`>
       : TTypeGenericError<
         `Only Positive and non floating numbers are supported. Received: '${L}'`
       >
@@ -980,9 +985,10 @@ class StringSchemaBuilder<
   maxLength<
     const L extends number,
     Valid = IsPositiveInteger<L>,
-    MinLengthValid = LessThan<Opts['minLength'] extends number ? Opts['minLength'] : number, L>>(
+    MinLengthValid = GreaterThan<L, Opts['minLength'] extends number ? Opts['minLength'] : number>>(
       value: Valid extends true
-        ? MinLengthValid extends true ? L
+        ? Opts['minLength'] extends undefined ? L
+        : MinLengthValid extends true ? L
         : TRangeGenericError<`MinLength are greater than MaxLength. MinLength: ${Opts['minLength']}. MaxLength: ${L}`>
         : TTypeGenericError<`Expected positive integer. Received: '${L}'`>,
     ): StringSchemaBuilder<S, { maxLength: L, minLength: Opts['minLength'], _preProcesses: Opts['_preProcesses'], _postProcesses: Opts['_postProcesses'] }> {
