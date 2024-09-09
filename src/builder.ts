@@ -65,7 +65,7 @@ export type AnySchemaBuilder =
 
 export type MetaObject = PickMany<
   BaseSchema,
-  ["title", "description", "deprecated", "$id", "$async", "$ref", "$schema"]
+  ["title", "description", "deprecated", "$id", "$async", "$ref", "$schema", "examples"]
 >;
 
 export type SafeParseResult<T> =
@@ -317,9 +317,15 @@ export class SchemaBuilder<
 
   /**
    * Meta object. Adds meta information fields in your schema, such as `deprecated`, `description`, `$id`, `title` and more!
+   * 
+   * @see {@link https://json-schema.org/draft/2020-12/json-schema-validation#name-examples json-schema draft 2020-12}
+   * @see {@link https://json-schema.org/understanding-json-schema/reference/annotations json-schema annotations}
    */
   meta(obj: MetaObject) {
     Object.entries(obj).forEach(([key, value]) => {
+      if (key === 'examples' && !Array.isArray(value)) {
+        throw new TypeError(`Cannot declare "examples" field for not an array. See`)
+      }
       this.custom(key, value);
     });
     return this;
@@ -1013,13 +1019,13 @@ class StringSchemaBuilder<
           `Expected positive integer. Received: '${L}'`
         >,
     ): StringSchemaBuilder<S, { minLength: L, maxLength: L, _postProcesses: Opts['_postProcesses'], _preProcesses: Opts['_preProcesses'] }> {
-    return this.maxLength(value as never).minLength(value as never) as never;
+    return this.maxLength<L>(value as never).minLength<L>(value as never) as never;
   }
   /**
    * Define non empty string. Same as `minLength(1)`
    */
   nonEmpty(): StringSchemaBuilder<S, { minLength: 1, maxLength: Opts['maxLength'], _preProcesses: Opts['_preProcesses'], _postProcesses: Opts['_postProcesses'] }> {
-    return this.minLength(1 as never);
+    return this.minLength<1>(1 as never);
   }
 
   /**
@@ -1749,25 +1755,15 @@ class ArraySchemaBuilder<
       : TRangeGenericError<`MinLength not equal to Length. MinLength: ${Opts['minLength']}. Length: ${L}`>
       : TRangeGenericError<`MaxLength not equal to Length. MaxLength: ${Opts['maxLength']}. Length: ${L}`>,
   ): ArraySchemaBuilder<El, Create<L, El>, S, Pick<Opts, 'prefix'> & { minLength: L, maxLength: L }> {
-    return this.minLength(value as never).maxLength(value as never) as never;
+    return this.minLength<L>(value as never).maxLength<L>(value as never) as never;
   }
 
   /**
    * same as `s.array().minLength(1)`
    * @see {@link ArraySchemaBuilder.minLength}
    */
-  nonEmpty<
-    // `HasLength` shows is Arr['length'] returns number or not
-    // Example: Input: string[], HasLength<number, number> = false
-    // Example: Input: [string, string], HasLength<2, number> = true
-    HasLength = GreaterThan<Arr["length"], number>,
-  >(): ArraySchemaBuilder<
-    El,
-    HasLength extends true ? Arr : [El, ...El[]],
-    S,
-    { prefix: Opts['prefix'], minLength: 1, maxLength: Opts['maxLength'] }
-  > {
-    return this.minLength(1 as never) as never;
+  nonEmpty() {
+    return this.minLength<1>(1 as never);
   }
 
   /**

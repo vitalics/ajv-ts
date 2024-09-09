@@ -295,7 +295,7 @@ test('should schema update shape property too', () => {
   expect(AnySchema.shape).toMatchObject(NumberSchema)
 })
 
-test('should preprocess work', () => {
+test('preprocess should work', () => {
   const ss =
     s.string()
   const ssPre = ss.preprocess(() => '1' as const)
@@ -313,4 +313,19 @@ test('fromJSON should work', () => {
   const qwe = s.fromJSON({ someProp: 'qwe' }, s.number())
   expect(qwe.schema.someProp).toBe('qwe')
   expect(qwe.schema.type).toBe('number')
+})
+
+test('examples should throw for not an array', () => {
+  expect(() => s.string().meta({
+    // @ts-expect-error shoould throw
+    examples: 'asd'
+  })).toThrowError(TypeError)
+})
+
+test('examples should use in output schema', () => {
+  expect(s.string().meta({
+    examples: ['foo']
+  }).schema).toMatchObject({
+    type: 'string', examples: ['foo']
+  })
 })
