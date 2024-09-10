@@ -3,6 +3,17 @@ import ajvErrors from "ajv-errors";
 import addFormats from "ajv-formats";
 
 import type {
+  And,
+  GreaterThan,
+  GreaterThanOrEqual,
+  IsFloat,
+  IsInteger,
+  LessThan,
+  LessThanOrEqual,
+  Or,
+} from 'type-fest'
+
+import type {
   AnySchema,
   AnySchemaOrAnnotation,
   ArraySchema,
@@ -15,18 +26,18 @@ import type {
   ObjectSchema,
   StringSchema,
 } from "./schema/types";
-import { Create, MakeReadonly, Optional, Push } from "./types/array";
+import type { Create, MakeReadonly, Optional } from "./types/array";
 import type {
+  // Debug,
   Fn,
   Object as ObjectTypes,
   UnionToIntersection,
   UnionToTuple,
 } from "./types/index";
-import type { GreaterThan, GreaterThanOrEqual, IsPositiveInteger, LessThan } from "./types/number";
 import type { OmitByValue, OmitMany, PickMany, Prettify } from "./types/object";
 import type { Email, UUID } from "./types/string";
 import type { TRangeGenericError, TTypeGenericError } from './types/errors';
-
+import type { IsPositiveInteger, NumericStringifyType } from './types/number'
 /**
  * Default Ajv instance.
  *
@@ -663,27 +674,40 @@ export class SchemaBuilder<
   }
 }
 
+type NumberSchemaOpts = SchemaBuilderOpts & {
+  const?: number,
+  type?: 'integer' | 'number',
+  format?: NumberSchema["format"],
+  minValue?: number,
+  maxValue?: number,
+}
 class NumberSchemaBuilder<
   const N extends number = number,
-  Opts extends SchemaBuilderOpts = {
+  Opts extends NumberSchemaOpts = {
     _preProcesses: [],
     _postProcesses: [],
+    const: undefined,
+    type: 'number',
+    format: undefined,
+    minValue: undefined,
+    maxValue: undefined,
   }
-> extends SchemaBuilder<number, NumberSchema, N> {
+> extends SchemaBuilder<number, NumberSchema, N, Opts> {
   constructor() {
     super({ type: "number" });
   }
 
   /**
-   * change schema type from `any integer number` to `any number`.
-   *
+   * Define schema as `any number`.
    * Set schema `{type: 'number'}`
    *
-   * This is default behavior
+   * @note This is default behavior
    */
-  number() {
+  number(): NumberSchemaBuilder<N, Prettify<Omit<Opts, 'type'> & {
+    type: 'number',
+  }>> {
     this.schema.type = "number";
-    return this;
+    return this as never;
   }
 
   /**
@@ -693,32 +717,77 @@ class NumberSchemaBuilder<
    * a.schema // {type: "number", const: 5}
    * s.infer<typeof a> // 5
    */
-  const<const N extends number>(value: N): NumberSchemaBuilder<N> {
+  const<
+    const N extends number,
+    TypeValid = Opts['type'] extends 'integer' ? IsInteger<N> :
+    Or<IsFloat<N>, IsInteger<N>>,
+    FormatValid = Opts['format'] extends 'int32' ? IsInteger<N> :
+    Opts['format'] extends 'int64' ? IsInteger<N>
+    : Or<IsFloat<N>, IsInteger<N>>,
+    ValueValid = Opts['maxValue'] extends number ?
+    Opts['minValue'] extends number ?
+    And<LessThanOrEqual<N, Opts['maxValue']>, GreaterThanOrEqual<N, Opts['minValue']>>: LessThanOrEqual<N, Opts['maxValue']> : true
+  >(value: TypeValid extends true ?
+    FormatValid extends true ?
+    ValueValid extends true ?
+    N
+    : TTypeGenericError<`Constant cannot be more than "MaxValue" and less than "MinValue"`, [`MinValue:`, Opts['minValue'], 'MaxValue:', Opts['maxValue']]>
+    : TTypeGenericError<`Format invalid. Expected ${Opts['format']}. Got "${N}" (${NumericStringifyType<N>})`>
+    : TTypeGenericError<`Type invalid. Expected ${Opts['type']}. Got "${N}" (${NumericStringifyType<N>})`>
+  ): NumberSchemaBuilder<N, Prettify<Omit<Opts, 'const'> & {
+    const: N,
+  }>> {
     this.schema.const = value;
     return this as never;
   }
 
-  /** Set schema `{type: 'integer'}` */
-  integer() {
+  /**
+   * Define schema as `any integer number`.
+   * Set schema `{type: 'integer'}` 
+   */
+  integer(): NumberSchemaBuilder<N, Prettify<Omit<Opts, 'type'> & {
+    type: 'integer',
+  }>> {
     this.schema.type = "integer";
-    return this;
+    return this as never;
   }
+
+  /**
+   * Set schema `{type: 'integer'}`. Same as `integer` method
+   * @see {@link integer integer} method
+   */
+  int = this.integer
+
 
   /**
    * Appends format for your number schema.
    */
-  format(type: NumberSchema["format"]) {
-    this.schema.format = type;
-    return this;
+  format<
+    const Format extends 'int32' | 'double' | 'int64' | 'float',
+    FormatValid = Opts['type'] extends 'integer' ?
+    Format extends 'int32' ? true :
+    Format extends 'int64' ? true
+    // type=int. Format float or doouble
+    : false
+    // Rest
+    : true
+  >(format: FormatValid extends true ?
+    Format :
+    TTypeGenericError<`Wrong format for given type. Expected "int32" or "int64". Given: "${Format}"`>
+  ): NumberSchemaBuilder<N, Prettify<Omit<Opts, 'format'> & {
+    format: Format,
+  }>> {
+    this.schema.format = format as Format;
+    return this as never;
   }
 
   /** Getter. Retuns `minimum` or `exclusiveMinimum` depends on your schema definition */
-  get minValue() {
+  get minValue(): Opts['minValue'] extends number ? Opts['minValue'] : number {
     return this.schema.minimum ?? (this.schema.exclusiveMinimum as number);
   }
 
   /** Getter. Retuns `maximum` or `exclusiveMaximum` depends on your schema definition */
-  get maxValue() {
+  get maxValue(): Opts['maxValue'] extends number ? Opts['maxValue'] : number {
     return this.schema.maximum ?? (this.schema.exclusiveMaximum as number);
   }
 
@@ -731,13 +800,34 @@ class NumberSchemaBuilder<
    * s.number().min(2, true) // > 2
    * s.number().min(2) // >= 2
    */
-  minimum(value: number, exclusive = false) {
+  minimum<
+    const Min extends number = number,
+    Exclusive extends boolean = false,
+    MinLengthValid = Opts['maxValue'] extends number ? GreaterThan<Opts['maxValue'], Min> : true,
+    TypeValid = Opts['type'] extends 'integer' ? IsInteger<Min> :
+    Or<IsFloat<Min>, IsInteger<Min>>,
+    FormatValid = Opts['format'] extends undefined ? true : Opts['format'] extends 'int32' ? IsInteger<Min> :
+    Opts['format'] extends 'int64' ? IsInteger<N>
+    : Or<IsFloat<Min>, IsInteger<Min>>,
+  >(
+    value: MinLengthValid extends true ?
+      TypeValid extends true ?
+      FormatValid extends true ?
+      Min
+      : TTypeGenericError<`Format invalid. Expected ${Opts['format']}. Got "${Min}" (${NumericStringifyType<Min>})`>
+      : TTypeGenericError<`Type invalid. Expected ${Opts['type']}. Got "${Min}" (${NumericStringifyType<Min>})`>
+      : TTypeGenericError<`"MaxValue" is less than "MinValue"`, ['MaxValue:', Opts['maxValue'], "MinValue:", Min]>,
+    exclusive = false as Exclusive
+  ): NumberSchemaBuilder<N, Prettify<Omit<Opts, 'minValue'> & {
+    minValue: Min,
+  }>
+  > {
     if (exclusive) {
-      this.schema.exclusiveMinimum = value;
+      this.schema.exclusiveMinimum = value as Min;
     } else {
-      this.schema.minimum = value;
+      this.schema.minimum = value as Min;
     }
-    return this;
+    return this as never;
   }
 
   step = this.multipleOf;
@@ -747,7 +837,7 @@ class NumberSchemaBuilder<
    * It may be set to any positive number. Same as `step`.
    *
    * **NOTE**: Since JSON schema odes not allow to use `multipleOf` with negative value - we use `Math.abs` to transform negative values into positive
-   * @see {@link NumberSchemaBuilder.step step}
+   * @see {@link step step} method
    * @example
    * const a = s.number().multipleOf(10)
    *
@@ -767,52 +857,87 @@ class NumberSchemaBuilder<
   /**
    * marks you number maximum value
    */
-  maximum(value: number, exclusive = false) {
-    if (exclusive) {
-      this.schema.exclusiveMaximum = value;
-    } else {
-      this.schema.maximum = value;
+  maximum<
+    const Max extends number = number,
+    Exclusive extends boolean = false,
+    FormatValid = Opts['format'] extends undefined ? true : IsInteger<Max> extends true ? Opts['format'] extends 'int32' ? true : Opts['format'] extends 'int64' ? true : false : true,
+    TypeValid = Opts['type'] extends 'integer' ? IsInteger<Max> :
+    Or<IsFloat<Max>, IsInteger<Max>>,
+    MinLengthValid = Opts['minValue'] extends number ? LessThan<Opts['minValue'], Max> : true,
+  >(
+    value: MinLengthValid extends true ?
+      TypeValid extends true ?
+      FormatValid extends true ?
+      Max
+      : TTypeGenericError<`Format invalid. Expected ${Opts['format']}. Got "${Max}" (${NumericStringifyType<Max>})`>
+      : TTypeGenericError<`Type invalid. Expected ${Opts['type']}. Got "${Max}" (${NumericStringifyType<Max>})`>
+      : TTypeGenericError<`"MinValue" greater than "MaxValue"`, ['MinValue:', Opts['minValue'], 'MaxValue:', Max]>,
+    exclusive = false as Exclusive
+  ): NumberSchemaBuilder<
+    N, Prettify<Omit<Opts, 'maxValue'> & {
+      maxValue: Max,
     }
-    return this;
+    >> {
+    if (exclusive) {
+      this.schema.exclusiveMaximum = value as Max;
+    } else {
+      this.schema.maximum = value as Max;
+    }
+    return this as never;
   }
   /**
    * Greater than
    *
-   * @see {@link NumberSchemaBuilder.maximum}
-   * @see {@link NumberSchemaBuilder.gte}
+   * Range: `(value; Infinity)`
+   * @see {@link maximum} method
+   * @see {@link gte} method
    */
-  gt(value: number) {
-    return this.minimum(value, true);
+  gt<const V extends number>(value: V): NumberSchemaBuilder<N,
+    Prettify<Omit<Opts, 'minValue'> & {
+      minValue: V,
+    }>> {
+    return this.minimum(value as never, true);
   }
   /**
    * Greater than or equal
    *
    * Range: `[value; Infinity)`
-   * @see {@link NumberSchemaBuilder.maximum maximum}
-   * @see {@link NumberSchemaBuilder.gt gt}
+   * @see {@link maximum maximum}
+   * @see {@link gt gt}
    */
-  gte(value: number) {
-    return this.minimum(value);
+  gte<const V extends number>(value: V): NumberSchemaBuilder<N,
+    Prettify<Omit<Opts, 'minValue'> & {
+      minValue: V,
+    }>> {
+    return this.minimum(value as never);
   }
+
   /**
    * Less than
    *
    * Range: `(value; Infinity)`
-   * @see {@link NumberSchemaBuilder.minimum minimum}
-   * @see {@link NumberSchemaBuilder.lte lte}
+   * @see {@link minimum minimum} method
+   * @see {@link lte lte} method
    */
-  lt(value: number) {
-    return this.max(value, true);
+  lt<const V extends number>(value: V): NumberSchemaBuilder<
+    N, Prettify<Omit<Opts, 'maxValue'> & {
+      maxValue: V,
+    }
+    >> {
+    return this.max(value as never, true);
   }
   /**
    * Less than or Equal
    *
    * Range: `[value; Infinity)`
-   * @see {@link NumberSchemaBuilder.minimum}
-   * @see {@link NumberSchemaBuilder.lt}
+   * @see {@link minimum} method
+   * @see {@link lt} method
    */
-  lte(value: number) {
-    return this.max(value);
+  lte<const V extends number>(value: V): NumberSchemaBuilder<N,
+    Prettify<Omit<Opts, 'maxValue'> & {
+      maxValue: V,
+    }>> {
+    return this.max(value as never);
   }
   /** Any positive number (greater than `0`)
    * Range: `(0; Infinity)`
@@ -843,7 +968,7 @@ class NumberSchemaBuilder<
   }
   /** Marks incoming number between `MAX_SAFE_INTEGER` and `MIN_SAFE_INTEGER` */
   safe() {
-    return this.lte(Number.MAX_SAFE_INTEGER).gte(Number.MIN_SAFE_INTEGER);
+    return this.lte(Number.MAX_SAFE_INTEGER as 9007199254740991).gte(Number.MIN_SAFE_INTEGER as -9007199254740991);
   }
 }
 /**
@@ -869,13 +994,14 @@ function number<const N extends number = number>() {
  *
  * **NOTE:** By default Ajv fails `{"type": "integer"}` validation for `Infinity` and `NaN`.
  */
-function integer() {
-  return new NumberSchemaBuilder().integer();
+function integer<const N extends number = number>() {
+  return new NumberSchemaBuilder<N>().integer();
 }
 
 export type StringBuilderOpts = {
   minLength?: number
   maxLength?: number,
+  pattern?: string | RegExp
 }
 class StringSchemaBuilder<
   const S extends string = string,
@@ -925,10 +1051,14 @@ class StringSchemaBuilder<
    * const str1 = prefixS.parse("qwe") // Error
    * const str2 = prefixS.parse("S_Some") // OK
    */
-  pattern<Pattern extends string = string>(
-    pattern: string,
-  ): StringSchemaBuilder<Pattern, Opts> {
-    this.schema.pattern = pattern;
+  pattern<const In extends string | RegExp = string | RegExp>(
+    pattern: In,
+  ): StringSchemaBuilder<S, Prettify<Opts & { pattern: In }>> {
+    if (typeof pattern === 'string') {
+      this.schema.pattern = pattern;
+    } else if (pattern instanceof RegExp) {
+      this.schema.pattern = pattern.source
+    }
     return this as never;
   }
 
@@ -944,18 +1074,18 @@ class StringSchemaBuilder<
   /**
    * Define minimum string length.
    *
-   * Same as `min`
-   * @see {@link StringSchemaBuilder.min min}
+   * Same as `min` method
+   * @see {@link min min} method
    */
   minLength<
     const L extends number,
     Valid = IsPositiveInteger<L>,
-    MinLengthValid extends boolean = GreaterThan<L, Opts['maxLength'] extends number ? Opts['maxLength'] : number>
+    MinLengthValid = GreaterThan<L, Opts['maxLength'] extends number ? Opts['maxLength'] : number>,
   >(
     value: Valid extends true
-      ? MinLengthValid extends true
+      ? Opts['maxLength'] extends undefined
       ? L
-      : TRangeGenericError<`MinLength are greater than MaxLength. MinLength: ${L}. MaxLength: ${Opts['maxLength']}`>
+      : MinLengthValid extends true ? L : TRangeGenericError<`MinLength are greater than MaxLength. MinLength: ${L}. MaxLength: ${Opts['maxLength']}`>
       : TTypeGenericError<
         `Only Positive and non floating numbers are supported. Received: '${L}'`
       >
@@ -975,14 +1105,15 @@ class StringSchemaBuilder<
    * Define maximum string length.
    *
    * Same as `max`
-   * @see {@link StringSchemaBuilder.max max}
+   * @see {@link max max} method
    */
   maxLength<
     const L extends number,
     Valid = IsPositiveInteger<L>,
-    MinLengthValid = LessThan<Opts['minLength'] extends number ? Opts['minLength'] : number, L>>(
+    MinLengthValid = GreaterThan<L, Opts['minLength'] extends number ? Opts['minLength'] : number>>(
       value: Valid extends true
-        ? MinLengthValid extends true ? L
+        ? Opts['minLength'] extends undefined ? L
+        : MinLengthValid extends true ? L
         : TRangeGenericError<`MinLength are greater than MaxLength. MinLength: ${Opts['minLength']}. MaxLength: ${L}`>
         : TTypeGenericError<`Expected positive integer. Received: '${L}'`>,
     ): StringSchemaBuilder<S, { maxLength: L, minLength: Opts['minLength'], _preProcesses: Opts['_preProcesses'], _postProcesses: Opts['_postProcesses'] }> {

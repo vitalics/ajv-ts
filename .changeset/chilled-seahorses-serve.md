@@ -1,10 +1,8 @@
-# x.x.x
+---
+"ajv-ts": minor
+---
 
-## 💥 Breaking Changes
-
-## ✅ New Features
-
-- [strict number](#strict-numbers)
+Make [strict numbers](#strict-numbers)
 
 ### Strict numbers
 
@@ -23,10 +21,6 @@ s.number().int().format('double') // error in format!
 s.number().min(5).max(3) // error in range!
 s.number().min(3).max(5).const(10) // error in constant - out of range!
 ```
-
-## 🐛 Bug Fixes
-
-- [#61](https://github.com/vitalics/ajv-ts/issues/61)
 
 ## 🏡 Chore/Infra
 

@@ -22,3 +22,10 @@ test('should pass validation', () => {
   optionalStr.parse(null)
   expect(() => optionalStr.parse(undefined)).toThrow()
 })
+
+test.todo('pattern should be applied for RegExp instance', () => {
+  const etalon = s.string().pattern('^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$')
+  const withRegExp = s.string().pattern(new RegExp('^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$'))
+
+  etalon.parse()
+})

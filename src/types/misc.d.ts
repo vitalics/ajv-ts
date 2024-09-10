@@ -55,3 +55,5 @@ export type Fn<
 
 export type Return<F extends Fn<any, any>> = F extends Fn<infer Res> ? Res : never
 export type Param<F> = F extends Fn<any, infer Args> ? Args : never
+
+export type Debug<Name extends string, T> = [Name, T]
