@@ -333,7 +333,7 @@ double: double according to the [openApi 3.0.0 specification](https://spec.opena
 
 ### Typescript features
 
-> from 0.8
+> from >= 0.8
 
 We make validation for number `type`, `format`, `minValue` and `maxValue` fields. That means we handle it in our side so you get an error for invalid values.
 
