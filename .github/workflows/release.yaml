@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         node_version: [20]
-        pnpm_version: [9.4.0]
+        pnpm_version: [9.9.0]
     steps:
       - name: Clone repository
         uses: actions/checkout@v3
