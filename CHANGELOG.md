@@ -1,5 +1,17 @@
 # ajv-ts
 
+## 0.8.0
+
+### Minor Changes
+
+- 0fb0e0e: new: make number more stricter
+
+  fix #61
+
+### Patch Changes
+
+- 37a7b1d: fix # 61
+
 ## 0.7.1
 
 ### Patch Changes
