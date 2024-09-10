@@ -2,4 +2,4 @@
 "ajv-ts": patch
 ---
 
-fix # 61
+fix #61
