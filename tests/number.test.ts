@@ -122,3 +122,29 @@ test('integer should supports only integers', () => {
   expect(schema.validate(400)).toBe(false)
   expect(schema.validate(12.4)).toBe(false)
 })
+
+test('incompatible format should fail type', () => {
+  // @ts-expect-error should fails
+  const schema1 = s.int().format('double')
+  // @ts-expect-error should fails
+  const schema2 = s.int().format('float')
+  // @ts-expect-error should fails
+  const schema3 = s.int().const(3.4)
+
+  // @ts-expect-error should fails
+  const schema4 = s.int().max(3.4)
+  // @ts-expect-error should fails
+  const schema5 = s.int().min(3.4)
+  // @ts-expect-error should fails
+  const schema6 = s.int().const(3.4)
+})
+
+test('ranges should fails for out of range', () => {
+  // @ts-expect-error should fails
+  s.int().min(1).max(3).const(-1)
+
+  // @ts-expect-error should fails
+  s.int().min(5).max(3)
+  // @ts-expect-error should fails
+  s.int().max(2).min(3)
+})

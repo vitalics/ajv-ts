@@ -14,6 +14,15 @@
   - [String](#string)
     - [Typescript features](#typescript-features)
   - [Numbers](#numbers)
+    - [Types](#types)
+      - [Number](#number)
+      - [Int](#int)
+    - [Formats](#formats)
+      - [int32](#int32)
+      - [int64](#int64)
+      - [float](#float)
+      - [double](#double)
+    - [Typescript features](#typescript-features-1)
   - [BigInts](#bigints)
   - [NaNs](#nans)
   - [Dates](#dates)
@@ -40,7 +49,7 @@
     - [`.element`](#element)
     - [`.nonempty`](#nonempty)
     - [`.min`/`.max`/`.length`/`.minLength`/`.maxLength`](#minmaxlengthminlengthmaxlength)
-    - [Typescript features](#typescript-features-1)
+    - [Typescript features](#typescript-features-2)
     - [`.unique`](#unique)
     - [`.contains`/`.minContains`](#containsmincontains)
   - [Tuples](#tuples)
@@ -274,6 +283,72 @@ s.number().negative(); //     < 0
 s.number().nonpositive(); //  <= 0
 
 s.number().multipleOf(5); // Evenly divisible by 5. Alias .step(5)
+```
+
+### Types
+
+#### Number
+
+Number - any number type
+
+```ts
+s.number()
+// same as
+s.number().number()
+```
+
+#### Int
+
+Only integers values.
+
+Note: we check in runtime non-integer format (`float`, `double`) and give an error.
+
+```ts
+s.number().int()
+// or
+s.number().integer()
+// or
+s.int()
+```
+
+### Formats
+
+Defines in [ajv-formats](https://ajv.js.org/packages/ajv-formats.html#formats) package
+
+#### int32
+
+Signed 32 bits integer according to the [openApi 3.0.0 specification](https://spec.openapis.org/oas/v3.0.0#data-types)
+
+#### int64
+
+Signed 64 bits according to the [openApi 3.0.0 specification](https://spec.openapis.org/oas/v3.0.0#data-types)
+
+#### float
+
+float: float according to the [openApi 3.0.0 specification](https://spec.openapis.org/oas/v3.0.0#data-types)
+
+#### double
+
+double: double according to the [openApi 3.0.0 specification](https://spec.openapis.org/oas/v3.0.0#data-types)
+
+### Typescript features
+
+> from 0.8
+
+We make validation for number `type`, `format`, `minValue` and `maxValue` fields. That means we handle it in our side so you get an error for invalid values.
+
+Examples:
+
+```ts
+s.number().format('float').int() // error in type!
+s.int().const(3.4) // error in type!
+s.number().int().format('float') // error in format!
+s.number().int().format('double') // error in format!
+
+// ranges are also check for possibility
+
+s.number().min(5).max(3) // error in range!
+s.number().min(3).max(5).const(10) // error in constant!
 ```
 
 ## BigInts

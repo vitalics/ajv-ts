@@ -1,4 +1,4 @@
-import type { GreaterThan, GreaterThanOrEqual, LessThan, IsFloat, IsNegative, IsPositiveInteger, LessThanOrEqual } from './number';
+import type { GreaterThan, GreaterThanOrEqual, LessThan, IsFloat, IsPositiveInteger, LessThanOrEqual } from './number';
 
 export type Create<
   L extends number,
