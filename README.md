@@ -7,6 +7,10 @@
   - [Zod unsupported APIs/differences](#zod-unsupported-apisdifferences)
   - [Installation](#installation)
   - [Basic usage](#basic-usage)
+  - [Base schema](#base-schema)
+    - [examples](#examples)
+    - [custom](#custom)
+    - [meta](#meta)
   - [JSON schema overriding](#json-schema-overriding)
   - [Defaults](#defaults)
   - [Primitives](#primitives)
@@ -134,6 +138,62 @@ User.parse({ username: "Ludwig" });
 // extract the inferred type
 type User = s.infer<typeof User>;
 // { username: string }
+```
+
+## Base schema
+
+Every schema inherits these class with next methods/properties
+
+### examples
+
+The `examples` keyword is a place to provide an array of examples that validate against the schema. This isn’t used for validation, but may help with explaining the effect and purpose of the schema to a reader. Each entry should validate against the schema in which it resides, but that isn’t strictly required. There is no need to duplicate the default value in the examples array, since default will be treated as another example.
+
+**Note**: While it is recommended that the examples validate against the subschema they are defined in, this requirement is not strictly enforced.
+
+Used to demonstrate how data should conform to the schema.
+examples does not affect data validation but serves as an informative annotation.
+
+```ts
+s.string().examples(["str1", 'string 2']) // OK
+s.number().examples(["str1", 'string 2']) // Error
+s.number().examples([1, 2, 3]) // OK
+s.number().examples(1, 2, 3) // OK
+```
+
+### custom
+
+Add custom schema key-value definition.
+
+set custom JSON-schema field. Useful if you need to declare something but no api founded for built-in solution.
+
+Example: `If-Then-Else` you cannot declare without `custom` method.
+
+```ts
+const myObj = s.object({
+ foo: s.string(),
+ bar: s.string()
+}).custom('if', {
+ "properties": {
+   "foo": { "const": "bar" }
+ },
+ "required": ["foo"]
+ }).custom('then', { "required": ["bar"] })
+```
+
+### meta
+
+Adds meta information fields in your schema, such as `deprecated`, `description`, `$id`, `title` and more!
+
+Example:
+
+```ts
+const numSchema = s.number().meta({
+  title: 'my number schema',
+  description: 'Some description',
+  deprecated: true
+})
+
+numSchema.schema // {type: 'number', title: 'my number schema', description: 'Some description', deprecated: true }
 ```
 
 ## JSON schema overriding

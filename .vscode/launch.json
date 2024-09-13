@@ -19,7 +19,7 @@
        * Open terminal when debugging starts (Optional)
        * Useful to see console.logs
        */
-      "console": "integratedTerminal",
+      "console": "internalConsole",
       "internalConsoleOptions": "neverOpen",
       // Files to exclude from debugger (e.g. call stack)
       "skipFiles": [
