@@ -1,5 +1,26 @@
 # ajv-ts
 
+## 0.9.0
+
+### Minor Changes
+
+- [#70](https://github.com/vitalics/ajv-ts/pull/70) [`1c36eca`](https://github.com/vitalics/ajv-ts/commit/1c36eca3d77da5229f21e1aa3d4ecad27813160f) Thanks [@vitalics](https://github.com/vitalics)! - Add `example` for every schema.
+
+  Example:
+
+  ```ts
+  s.string().examples(["str1", "string 2"]); // OK
+  s.number().examples(["str1", "string 2"]); // Error in typescript, but OK
+  s.number().examples([1, 2, 3]); // OK
+  s.number().examples(1, 2, 3); // OK
+  ```
+
+### Patch Changes
+
+- [#67](https://github.com/vitalics/ajv-ts/pull/67) [`1eab44b`](https://github.com/vitalics/ajv-ts/commit/1eab44b72dcef6549db7a8f543b8008fc15cad6e) Thanks [@vitalics](https://github.com/vitalics)! - switch changeset type to github
+
+- [#68](https://github.com/vitalics/ajv-ts/pull/68) [`dda3326`](https://github.com/vitalics/ajv-ts/commit/dda3326c1657e5b48c2487cc124d6ee4b5c010b3) Thanks [@vitalics](https://github.com/vitalics)! - update pnpm minor version
+
 ## 0.8.0
 
 ### Minor Changes
