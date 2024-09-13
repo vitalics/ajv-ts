@@ -237,7 +237,7 @@ export class SchemaBuilder<
    * @see {@link https://www.learnjsonschema.com/2020-12/meta-data/examples JSON-schema examples definition}
    * @example
    * s.string().examples(["str1", 'string 2']) // OK
-   * s.number().examples(["str1", 'string 2']) // Error
+   * s.number().examples(["str1", 'string 2']) // Error in Typescript, schema is OK
    * s.number().examples([1, 2, 3]) // OK
    * s.number().examples(1, 2, 3) // OK
    */
