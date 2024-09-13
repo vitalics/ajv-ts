@@ -315,14 +315,57 @@ test('fromJSON should work', () => {
   expect(qwe.schema.type).toBe('number')
 })
 
-test('examples should throw for not an array', () => {
-  expect(() => s.string().meta({
-    // @ts-expect-error shoould throw
-    examples: 'asd'
-  })).toThrowError(TypeError)
+test('example should work for array of examples', () => {
+  const stringSchema = s.string().examples(['asd', 'zxc'])
+  expect(stringSchema.schema).toMatchObject({
+    type: 'string',
+    examples: ['asd', 'zxc'],
+  })
 })
 
-test('examples should use in output schema', () => {
+test('example should work for spread array of examples', () => {
+  const stringSchema1 = s.string().examples('asd', 'zxc')
+  const stringSchema2 = s.string().examples('asd')
+  expect(stringSchema1.schema).toMatchObject({
+    type: 'string',
+    examples: ['asd', 'zxc'],
+  })
+  expect(stringSchema2.schema).toMatchObject({
+    type: 'string',
+    examples: ['asd'],
+  })
+})
+
+test('example should throw type error for not output type', () => {
+  // @ts-expect-error will throws
+  const s1 = s.number().examples('asd', 'zxc')
+  // NOTE: only typescript checking. Any schema is valid
+  expect(s1.schema).toMatchObject({
+    type: 'number',
+    examples: ['asd', 'zxc']
+  })
+  // @ts-expect-error will throws
+  const s2 = s.number().examples(['asd', 'zxc'])
+  // NOTE: only typescript checking. Any schema is valid
+  expect(s2.schema).toMatchObject({
+    type: 'number',
+    examples: ['asd', 'zxc']
+  })
+})
+
+test('examples in meta should not throw for not an array', () => {
+  expect(() => s.string().meta({
+    examples: 'asd'
+  })).not.toThrowError(TypeError)
+  expect(s.string().meta({
+    examples: 'asd'
+  }).schema).toMatchObject({
+    type: 'string',
+    examples: ['asd']
+  })
+})
+
+test('examples in meta should use in output schema', () => {
   expect(s.string().meta({
     examples: ['foo']
   }).schema).toMatchObject({

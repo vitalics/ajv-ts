@@ -76,8 +76,10 @@ export type AnySchemaBuilder =
 
 export type MetaObject = PickMany<
   BaseSchema,
-  ["title", "description", "deprecated", "$id", "$async", "$ref", "$schema", "examples"]
->;
+  ["title", "description", "deprecated", "$id", "$async", "$ref", "$schema"]
+> & {
+  examples?: unknown | unknown[]
+};
 
 export type SafeParseResult<T> =
   | SafeParseSuccessResult<T>
@@ -222,6 +224,35 @@ export class SchemaBuilder<
   }
 
   /**
+   * # 2020-12 Draft 6
+   * The `examples` keyword is a place to provide an array of examples that validate against the schema.
+   * This isn’t used for validation, but may help with explaining the effect and purpose of the schema
+   * to a reader. Each entry should validate against the schema in which it resides,
+   * but that isn’t strictly required. There is no need to duplicate the default value in the examples array,
+   * since default will be treated as another example.
+   *
+   * **Note:** While it is recommended that the examples validate against the subschema they are defined in, this requirement is not strictly enforced.
+   * - Used to demonstrate how data should conform to the schema.
+   * - `examples` does not affect data validation but serves as an informative annotation.
+   * @see {@link https://www.learnjsonschema.com/2020-12/meta-data/examples JSON-schema examples definition}
+   * @example
+   * s.string().examples(["str1", 'string 2']) // OK
+   * s.number().examples(["str1", 'string 2']) // Error
+   * s.number().examples([1, 2, 3]) // OK
+   * s.number().examples(1, 2, 3) // OK
+   */
+  examples(...examples: Output[]): this
+  examples(examples: Output[]): this
+  examples(...examples: unknown[]) {
+    if (examples.length === 1 && Array.isArray(examples[0])) {
+      (this.schema as Record<string, unknown>).examples = examples[0]
+    } else {
+      (this.schema as Record<string, unknown>).examples = examples
+    }
+    return this
+  }
+
+  /**
    * Marks your property as nullable (`undefined`)
    *
    * **NOTES**: json-schema not accept `undefined` type. It's just `nullable` as typescript `undefined` type.
@@ -334,10 +365,10 @@ export class SchemaBuilder<
    */
   meta(obj: MetaObject) {
     Object.entries(obj).forEach(([key, value]) => {
-      if (key === 'examples' && !Array.isArray(value)) {
-        throw new TypeError(`Cannot declare "examples" field for not an array. See`)
+      if (key === 'examples') {
+        return this.examples(value as never)
       }
-      this.custom(key, value);
+      return this.custom(key, value);
     });
     return this;
   }
@@ -726,7 +757,7 @@ class NumberSchemaBuilder<
     : Or<IsFloat<N>, IsInteger<N>>,
     ValueValid = Opts['maxValue'] extends number ?
     Opts['minValue'] extends number ?
-    And<LessThanOrEqual<N, Opts['maxValue']>, GreaterThanOrEqual<N, Opts['minValue']>>: LessThanOrEqual<N, Opts['maxValue']> : true
+    And<LessThanOrEqual<N, Opts['maxValue']>, GreaterThanOrEqual<N, Opts['minValue']>> : LessThanOrEqual<N, Opts['maxValue']> : true
   >(value: TypeValid extends true ?
     FormatValid extends true ?
     ValueValid extends true ?
