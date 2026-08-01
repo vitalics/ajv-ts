@@ -5,23 +5,15 @@ import {
   type AnySchemaOrAnnotation,
   type ArraySchema,
   type BooleanSchema,
-  ConstantAnnotation,
-  EnumAnnotation,
   type NumberSchema,
   type StringSchema,
 } from "../schema/types";
-import { SchemaBuilder } from "./base";
-import {
-  type Create,
-  type Drop,
-  MakeReadonly,
-  type Optional,
-  Tail,
-} from "../types/array";
-import type { OmitMany, Prettify } from "../types/object";
+import type { Create, Drop, MakeReadonly, Optional } from "../types/array";
+import { OmitUndefined } from "../types/arrayObject";
 import type { TRangeError, TTypeErrorNotSame } from "../types/errors";
 import type { IsPositiveInteger, Minus } from "../types/number";
-import { OmitUndefined } from "../types/arrayObject";
+import type { OmitMany, Prettify } from "../types/object";
+import { SchemaBuilder } from "./base";
 
 export type InferArray<
   S extends readonly AnySchemaBuilder[],
@@ -119,37 +111,16 @@ export type BuildArrayFromSchema<
   : Schema["readOnly"] extends true
   ? BuildArrayFromSchema<
       Pick<Schema, "type"> & Omit<Schema, "readOnly">,
-      Result extends readonly [
-        infer First,
-        ...infer Rest extends readonly unknown[]
-      ]
-        ? readonly [First, ...Rest]
-        : Result
+      MakeReadonly<Result>
     >
   : Result;
-
-// type Test = BuildArrayFromSchema<{
-//   maxItems: 5;
-//   minItems: 2;
-//   readOnly: true;
-//   items: [NumberSchema, StringSchema];
-//   type: "array";
-// }>;
-type Test = BuildArrayFromSchema<{
-  maxItems: 5;
-  minItems: 2;
-  readOnly: true;
-  prefixItems: [BooleanSchema];
-  items: [NumberSchema, StringSchema];
-  type: "array";
-}>;
 
 class ElementSchemaBuilder<
   S extends AnySchemaOrAnnotation,
   Out
 > extends SchemaBuilder<S, S, Out> {}
 
-// @ts-expect-error deep infinite
+// @ts-expect-error infinite
 export class ArraySchemaBuilder<
   const Input extends AnySchemaOrAnnotation = AnySchemaOrAnnotation,
   const Schema extends ArraySchema = {
@@ -166,21 +137,18 @@ export class ArraySchemaBuilder<
   }
 
   /**
-   * Mark your array `readOnly` and `unevaluatedItems=false`
-   * @see {@link https://json-schema.org/draft/2020-12/draft-bhutton-json-schema-00#rfc.section.11.2}
+   * Mark your array `readOnly`.
    */
   override readonly(): ArraySchemaBuilder<
     Input,
     Prettify<
       Pick<Schema, "type"> &
-        OmitMany<Schema, ["readOnly", "unevaluatedItems"]> & {
+        Omit<Schema, "readOnly"> & {
           readonly readOnly: true;
-          readonly unevaluatedItems: false;
         }
     >
   > {
     this.schema.readOnly = true;
-    this.schema.unevaluatedItems = false;
     return this as never;
   }
 
@@ -424,16 +392,21 @@ export class ArraySchemaBuilder<
   /**
    * Returns schema builder of the element.
    */
-  get element(): SchemaBuilder<Input, Input, InferAnyShemaOrAnnotationType<Input>> {
+  get element(): SchemaBuilder<
+    Input,
+    Input,
+    InferAnyShemaOrAnnotationType<Input>
+  > {
     const elementSchema = this.schema.items;
     if (Array.isArray(elementSchema)) {
       const builder = array();
       builder.schema = { type: "array", items: elementSchema } as never;
       return builder as never;
     }
-    const builder = new ElementSchemaBuilder<Input, InferAnyShemaOrAnnotationType<Input>>(
-      elementSchema as never
-    );
+    const builder = new ElementSchemaBuilder<
+      Input,
+      InferAnyShemaOrAnnotationType<Input>
+    >(elementSchema as never);
     return builder as never;
   }
 
