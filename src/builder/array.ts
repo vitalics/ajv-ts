@@ -9,7 +9,6 @@ import {
   type StringSchema,
 } from "../schema/types";
 import type { Create, Drop, MakeReadonly, Optional } from "../types/array";
-import { OmitUndefined } from "../types/arrayObject";
 import type { TRangeError, TTypeErrorNotSame } from "../types/errors";
 import type { IsPositiveInteger, Minus } from "../types/number";
 import type { OmitMany, Prettify } from "../types/object";
@@ -17,108 +16,108 @@ import { SchemaBuilder } from "./base";
 
 export type InferArray<
   S extends readonly AnySchemaBuilder[],
-  Result extends readonly unknown[] = []
+  Result extends readonly unknown[] = [],
 > = S extends readonly [
   infer First extends AnySchemaBuilder,
-  ...infer Rest extends readonly AnySchemaBuilder[]
+  ...infer Rest extends readonly AnySchemaBuilder[],
 ]
   ? InferArray<Rest, [...Result, First["_output"]]>
   : Result;
 
 type InferSchemaBuilderArrayToSchema<
   T extends readonly AnySchemaBuilder[],
-  Result extends readonly AnySchemaOrAnnotation[] = []
+  Result extends readonly AnySchemaOrAnnotation[] = [],
 > = T extends readonly [
   infer First extends AnySchemaBuilder,
-  ...infer Rest extends readonly AnySchemaBuilder[]
+  ...infer Rest extends readonly AnySchemaBuilder[],
 ]
   ? InferSchemaBuilderArrayToSchema<Rest, [...Result, First["_schema"]]>
   : Result;
 
 type InferAnyShemaOrAnnotationType<T extends AnySchemaOrAnnotation> =
   T extends NumberSchema
-    ? number
-    : T extends StringSchema
-    ? string
-    : T extends BooleanSchema
-    ? boolean
-    : T extends { enum: infer ArrayOfValues extends readonly string[] }
-    ? ArrayOfValues
-    : unknown;
+  ? number
+  : T extends StringSchema
+  ? string
+  : T extends BooleanSchema
+  ? boolean
+  : T extends { enum: infer ArrayOfValues extends readonly string[] }
+  ? ArrayOfValues
+  : unknown;
 
 type InferAnySchemaOrAnnotationArray<
   T extends readonly AnySchemaOrAnnotation[],
-  Result extends readonly unknown[] = []
+  Result extends readonly unknown[] = [],
 > = T extends [
   infer First extends AnySchemaOrAnnotation,
-  ...infer Rest extends readonly AnySchemaOrAnnotation[]
+  ...infer Rest extends readonly AnySchemaOrAnnotation[],
 ]
   ? InferAnySchemaOrAnnotationArray<
-      Rest,
-      [...Result, InferAnyShemaOrAnnotationType<First>]
-    >
+    Rest,
+    [...Result, InferAnyShemaOrAnnotationType<First>]
+  >
   : Result;
 
 type GetItemsFromSchema<Schema extends ArraySchema> =
   Schema["items"] extends AnySchemaOrAnnotation
-    ? InferAnyShemaOrAnnotationType<Schema["items"]>[]
-    : Schema["items"] extends readonly AnySchemaOrAnnotation[]
-    ? InferAnySchemaOrAnnotationArray<Schema["items"]>
-    : [];
+  ? InferAnyShemaOrAnnotationType<Schema["items"]>[]
+  : Schema["items"] extends readonly AnySchemaOrAnnotation[]
+  ? InferAnySchemaOrAnnotationArray<Schema["items"]>
+  : [];
 
 type GetPrefixItemsFromSchema<Schema extends ArraySchema> =
   Schema["prefixItems"] extends readonly AnySchemaOrAnnotation[]
-    ? InferAnySchemaOrAnnotationArray<Schema["prefixItems"]>
-    : [];
+  ? InferAnySchemaOrAnnotationArray<Schema["prefixItems"]>
+  : [];
 
 export type BuildArrayFromSchema<
   Schema extends ArraySchema,
   Result extends readonly unknown[] = [...GetItemsFromSchema<Schema>],
-  El = GetItemsFromSchema<Schema>[number]
+  El = GetItemsFromSchema<Schema>[number],
 > = Schema["maxItems"] extends number
   ? Schema["minItems"] extends number
-    ? BuildArrayFromSchema<
-        Pick<Schema, "type"> & OmitMany<Schema, ["maxItems", "minItems"]>,
-        [
-          ...minItems: Create<Schema["minItems"], El>,
-          ...maxItems: Optional<
-            Create<Minus<Schema["maxItems"], Schema["minItems"]>, El>
-          >
-        ]
-      >
-    : BuildArrayFromSchema<
-        Pick<Schema, "type"> & Omit<Schema, "maxItems">,
-        [...maxItems: Create<Schema["maxItems"], El>]
-      >
+  ? BuildArrayFromSchema<
+    Pick<Schema, "type"> & OmitMany<Schema, ["maxItems", "minItems"]>,
+    [
+      ...minItems: Create<Schema["minItems"], El>,
+      ...maxItems: Optional<
+        Create<Minus<Schema["maxItems"], Schema["minItems"]>, El>
+      >,
+    ]
+  >
+  : BuildArrayFromSchema<
+    Pick<Schema, "type"> & Omit<Schema, "maxItems">,
+    [...maxItems: Create<Schema["maxItems"], El>]
+  >
   : Schema["minItems"] extends number
   ? Schema["minItems"] extends 0
-    ? BuildArrayFromSchema<
-        Pick<Schema, "type"> & Omit<Schema, "minItems">,
-        Result
-      >
-    : BuildArrayFromSchema<
-        Pick<Schema, "type"> & Omit<Schema, "minItems">,
-        [
-          ...minItems: Create<Schema["minItems"], El>,
-          ...items: Optional<Drop<Result, Schema["minItems"]>>
-        ]
-      >
+  ? BuildArrayFromSchema<
+    Pick<Schema, "type"> & Omit<Schema, "minItems">,
+    Result
+  >
+  : BuildArrayFromSchema<
+    Pick<Schema, "type"> & Omit<Schema, "minItems">,
+    [
+      ...minItems: Create<Schema["minItems"], El>,
+      ...items: Optional<Drop<Result, Schema["minItems"]>>,
+    ]
+  >
   : Schema["prefixItems"] extends readonly AnySchemaOrAnnotation[]
   ? BuildArrayFromSchema<
-      Pick<Schema, "type"> & Omit<Schema, "prefixItems">,
-      [...prefixItems: GetPrefixItemsFromSchema<Schema>, ...items: Result]
-    >
+    Pick<Schema, "type"> & Omit<Schema, "prefixItems">,
+    [...prefixItems: GetPrefixItemsFromSchema<Schema>, ...items: Result]
+  >
   : Schema["readOnly"] extends true
   ? BuildArrayFromSchema<
-      Pick<Schema, "type"> & Omit<Schema, "readOnly">,
-      MakeReadonly<Result>
-    >
+    Pick<Schema, "type"> & Omit<Schema, "readOnly">,
+    MakeReadonly<Result>
+  >
   : Result;
 
 class ElementSchemaBuilder<
   S extends AnySchemaOrAnnotation,
-  Out
-> extends SchemaBuilder<S, S, Out> {}
+  Out,
+> extends SchemaBuilder<S, S, Out> { }
 
 // @ts-expect-error infinite
 export class ArraySchemaBuilder<
@@ -126,8 +125,9 @@ export class ArraySchemaBuilder<
   const Schema extends ArraySchema = {
     readonly type: "array";
     readonly items: Input;
-  }
-> extends SchemaBuilder<Input, Schema, BuildArrayFromSchema<Schema>> {
+  },
+  const Output extends readonly unknown[] = BuildArrayFromSchema<Schema>,
+> extends SchemaBuilder<Input, Schema, Output> {
   constructor(definition?: Input) {
     super({
       type: "array",
@@ -143,10 +143,11 @@ export class ArraySchemaBuilder<
     Input,
     Prettify<
       Pick<Schema, "type"> &
-        Omit<Schema, "readOnly"> & {
-          readonly readOnly: true;
-        }
-    >
+      Omit<Schema, "readOnly"> & {
+        readonly readOnly: true;
+      }
+    >,
+    MakeReadonly<Output>
   > {
     this.schema.readOnly = true;
     return this as never;
@@ -159,17 +160,18 @@ export class ArraySchemaBuilder<
    */
   prefix<
     const El extends AnySchemaBuilder,
-    const PrefixesSchema extends readonly El[]
+    const PrefixesSchema extends readonly El[],
   >(
     ...definitions: PrefixesSchema
   ): ArraySchemaBuilder<
     Input,
     Prettify<
       Pick<Schema, "type"> &
-        Omit<Schema, "prefixItems"> & {
-          readonly prefixItems: InferSchemaBuilderArrayToSchema<PrefixesSchema>;
-        }
-    >
+      Omit<Schema, "prefixItems"> & {
+        readonly prefixItems: InferSchemaBuilderArrayToSchema<PrefixesSchema>;
+      }
+    >,
+    Output
   > {
     this.schema.prefixItems = definitions.map((def) => def.schema);
     return this as never;
@@ -181,10 +183,11 @@ export class ArraySchemaBuilder<
     Input,
     Prettify<
       Pick<Schema, "type"> &
-        Omit<Schema, "items"> & {
-          readonly items: [Input, ...InferSchemaBuilderArrayToSchema<S>];
-        }
-    >
+      Omit<Schema, "items"> & {
+        readonly items: [Input, ...InferSchemaBuilderArrayToSchema<S>];
+      }
+    >,
+    Output
   > {
     if (Array.isArray(this.schema.items)) {
       this.schema.items.push(...shemas.map((el) => el.schema));
@@ -215,52 +218,54 @@ export class ArraySchemaBuilder<
    */
   maxLength<
     const L extends number,
-    const IsValidByMaxLength extends boolean = Schema["maxLength"] extends undefined
-      ? true
-      : Schema["maxLength"] extends number
-      ? LessThan<L, Schema["maxLength"]>
-      : true
+    const IsValidByMaxLength extends boolean =
+    Schema["maxLength"] extends undefined
+    ? true
+    : Schema["maxLength"] extends number
+    ? LessThan<L, Schema["maxLength"]>
+    : true,
   >(
     value: IsPositiveInteger<L> extends false
       ? TTypeErrorNotSame<
-          L,
-          "Positive integer (> 0)",
-          [
-            `Is Valid By Max Length? ${IsValidByMaxLength}`,
-            `Is Positive Integer? ${IsPositiveInteger<L>}`
-          ]
-        >
+        L,
+        "Positive integer (> 0)",
+        [
+          `Is Valid By Max Length? ${IsValidByMaxLength}`,
+          `Is Positive Integer? ${IsPositiveInteger<L>}`,
+        ]
+      >
       : IsValidByMaxLength extends false
       ? TRangeError<
-          `MaxLength is less than minLength.`,
-          [`MinLength: ${L}`, `MaxLength: ${Schema["maxLength"]}`]
-        >
+        `MaxLength is less than minLength.`,
+        [`MinLength: ${L}`, `MaxLength: ${Schema["maxLength"]}`]
+      >
       : L extends 0
       ? TTypeErrorNotSame<
-          L,
-          "Only Positive and non floating numbers are supported.",
-          [
-            `Is Valid By Max Length? ${IsValidByMaxLength}`,
-            `Is Positive Integer? ${IsPositiveInteger<L>}`,
-            `L === 0 ? '${L extends 0 ? true : false}'`
-          ]
-        >
-      : L
+        L,
+        "Only Positive and non floating numbers are supported.",
+        [
+          `Is Valid By Max Length? ${IsValidByMaxLength}`,
+          `Is Positive Integer? ${IsPositiveInteger<L>}`,
+          `L === 0 ? '${L extends 0 ? true : false}'`,
+        ]
+      >
+      : L,
   ): ArraySchemaBuilder<
     Input,
     Prettify<
       Pick<Schema, "type"> &
-        Omit<Schema, "maxItems"> & {
-          readonly maxItems: L;
-        }
-    >
+      Omit<Schema, "maxItems"> & {
+        readonly maxItems: L;
+      }
+    >,
+    Output
   > {
     if ((value as L) < 0) {
       throw new TypeError(
         "Only Positive and non floating numbers are supported.",
         {
           cause: new RangeError(`expected incoming value < 0. Got ${value}`),
-        }
+        },
       );
     }
     this.schema.maxItems = value as L;
@@ -281,48 +286,49 @@ export class ArraySchemaBuilder<
 
   minLength<
     const L extends number,
-    const IsValidByMaxLength extends boolean = Schema["maxItems"] extends undefined
-      ? true
-      : Schema["maxItems"] extends number
-      ? LessThan<L, Schema["maxItems"]>
-      : true
+    const IsValidByMaxLength extends boolean =
+    Schema["maxItems"] extends undefined
+    ? true
+    : Schema["maxItems"] extends number
+    ? LessThan<L, Schema["maxItems"]>
+    : true,
   >(
     value: IsPositiveInteger<L> extends false
       ? TTypeErrorNotSame<
-          L,
-          `MinLength should be positive integer`,
-          [
-            `Is Valid By Max Length? '${IsValidByMaxLength}'`,
-            `Is Positive Integer? '${IsPositiveInteger<L>}'`
-          ]
-        >
+        L,
+        `MinLength should be positive integer`,
+        [
+          `Is Valid By Max Length? '${IsValidByMaxLength}'`,
+          `Is Positive Integer? '${IsPositiveInteger<L>}'`,
+        ]
+      >
       : IsValidByMaxLength extends false
       ? TRangeError<
-          `MaxLength is less than minLength.`,
-          [`MinLength: ${L}`, `MaxItems: ${Schema["maxItems"]}`],
-          [
-            `Is Valid By Max Length? '${IsValidByMaxLength}'`,
-            `Is Positive Integer? '${IsPositiveInteger<L>}'`
-          ]
-        >
+        `MaxLength is less than minLength.`,
+        [`MinLength: ${L}`, `MaxItems: ${Schema["maxItems"]}`],
+        [
+          `Is Valid By Max Length? '${IsValidByMaxLength}'`,
+          `Is Positive Integer? '${IsPositiveInteger<L>}'`,
+        ]
+      >
       : L extends 0
       ? TTypeErrorNotSame<
-          L,
-          "Only Positive and non floating numbers are supported.",
-          [
-            `Is Valid By Max Length? ${IsValidByMaxLength}`,
-            `Is Positive Integer? ${IsPositiveInteger<L>}`,
-            `L === 0 ? '${L extends 0 ? true : false}'`
-          ]
-        >
-      : L
+        L,
+        "Only Positive and non floating numbers are supported.",
+        [
+          `Is Valid By Max Length? ${IsValidByMaxLength}`,
+          `Is Positive Integer? ${IsPositiveInteger<L>}`,
+          `L === 0 ? '${L extends 0 ? true : false}'`,
+        ]
+      >
+      : L,
   ): ArraySchemaBuilder<
     Input,
     Prettify<
       Pick<Schema, "type"> &
-        Omit<Schema, "minItems"> & {
-          readonly minItems: L;
-        }
+      Omit<Schema, "minItems"> & {
+        readonly minItems: L;
+      }
     >
   > {
     if ((value as L) < 0) {
@@ -330,7 +336,7 @@ export class ArraySchemaBuilder<
         "Only Positive and non floating numbers are supported.",
         {
           cause: new RangeError(`expected incoming value < 0. Got ${value}`),
-        }
+        },
       );
     }
     this.schema.minItems = value as L;
@@ -338,19 +344,20 @@ export class ArraySchemaBuilder<
   }
 
   length<const L extends number>(
-    value: L
+    value: L,
   ): ArraySchemaBuilder<
     Input,
     Prettify<
       Pick<Schema, "type"> &
-        OmitMany<Schema, ["maxItems", "minItems"]> & {
-          readonly maxItems: L;
-          readonly minItems: L;
-        }
-    >
+      OmitMany<Schema, ["maxItems", "minItems"]> & {
+        readonly maxItems: L;
+        readonly minItems: L;
+      }
+    >,
+    Output
   > {
     return this.minLength<L>(value as never).maxLength<L>(
-      value as never
+      value as never,
     ) as never;
   }
 
@@ -362,10 +369,11 @@ export class ArraySchemaBuilder<
     Input,
     Prettify<
       Pick<Schema, "type"> &
-        Omit<Schema, "minItems"> & {
-          readonly minItems: 1;
-        }
-    >
+      Omit<Schema, "minItems"> & {
+        readonly minItems: 1;
+      }
+    >,
+    Output
   > {
     return this.minLength<1>(1 as never);
   }
@@ -383,7 +391,8 @@ export class ArraySchemaBuilder<
       Schema & {
         readonly uniqueItems: true;
       }
-    >
+    >,
+    Output
   > {
     this.schema.uniqueItems = true;
     return this as never;
@@ -414,14 +423,15 @@ export class ArraySchemaBuilder<
    * `contains` schema only needs to validate against one or more items in the array.
    */
   contains<S extends AnySchemaBuilder>(
-    containItem: S
+    containItem: S,
   ): ArraySchemaBuilder<
     Input,
     Prettify<
       Schema & {
         readonly contains: S["schema"];
       }
-    >
+    >,
+    Output
   > {
     this.schema.contains = containItem.schema;
     return this as never;
@@ -436,17 +446,18 @@ export class ArraySchemaBuilder<
     value: Valid extends true
       ? N
       : [
-          never,
-          'TypeError: "minContains" should be positive integer',
-          `Received: '${N}'`
-        ]
+        never,
+        'TypeError: "minContains" should be positive integer',
+        `Received: '${N}'`,
+      ],
   ): ArraySchemaBuilder<
     Input,
     Prettify<
       Schema & {
         readonly minContains: N;
       }
-    >
+    >,
+    Output
   > {
     this.schema.minContains = value as N;
     return this as never;
@@ -461,17 +472,18 @@ export class ArraySchemaBuilder<
     value: Valid extends true
       ? N
       : [
-          never,
-          'TypeError: "maxContains" should be positive integer',
-          `Received: '${N}'`
-        ]
+        never,
+        'TypeError: "maxContains" should be positive integer',
+        `Received: '${N}'`,
+      ],
   ): ArraySchemaBuilder<
     Input,
     Prettify<
       Schema & {
         readonly maxContains: N;
       }
-    >
+    >,
+    Output
   > {
     this.schema.maxContains = value as N;
     return this as never;
@@ -487,9 +499,10 @@ export class ArraySchemaBuilder<
  * tuple.schema // {type: 'array', items: [{type: 'string'}, {type: 'number'}] }
  */
 export function array<const S extends AnySchemaBuilder = AnySchemaBuilder>(
-  definition?: S
+  definition?: S,
 ) {
-  return new ArraySchemaBuilder<S["schema"]>(definition?.schema ?? {});
+  return new ArraySchemaBuilder<
+    S["schema"]>(definition?.schema ?? {});
 }
 
 export default array;
