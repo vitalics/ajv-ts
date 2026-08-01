@@ -21,39 +21,60 @@ type LastInUnion<U> = UnionToIntersection<
  * UnionToTuple<1 | 2> = [1, 2].
  */
 export type UnionToTuple<U, Last = LastInUnion<U>> = [U] extends [never]
-  ? []
-  : [...UnionToTuple<Exclude<U, Last>>, Last];
+  ? readonly []
+  : readonly [...UnionToTuple<Exclude<U, Last>>, Last];
 
-export type IsUnknown<T> =
-  T extends number ? false
-  : T extends string ? false
-  : T extends string ? false
-  : T extends boolean ? false
-  : T extends symbol ? false
-  : T extends undefined ? false
-  : T extends null ? false
-  : T extends object ? false
-  : T extends unknown ? true
-  : false
+export type IsUnknown<T> = T extends number
+  ? false
+  : T extends string
+  ? false
+  : T extends string
+  ? false
+  : T extends boolean
+  ? false
+  : T extends symbol
+  ? false
+  : T extends undefined
+  ? false
+  : T extends null
+  ? false
+  : T extends object
+  ? false
+  : T extends unknown
+  ? true
+  : false;
 
-export type ToPrimal<T> =
-  T extends number ? number
-  : T extends string ? string
-  : T extends boolean ? boolean
-  : T extends bigint ? bigint
-  : T extends symbol ? symbol
-  : T extends readonly unknown[] ? unknown[]
-  : T extends object ? object
-  : never
-export type IsNever<T> = [T] extends [never] ? true : false
+export type ToPrimal<T> = T extends number
+  ? number
+  : T extends string
+  ? string
+  : T extends boolean
+  ? boolean
+  : T extends bigint
+  ? bigint
+  : T extends symbol
+  ? symbol
+  : T extends readonly unknown[]
+  ? unknown[]
+  : T extends object
+  ? object
+  : never;
+export type IsNever<T> = [T] extends [never] ? true : false;
 
 export type Fn<
   R = unknown,
   Args extends readonly unknown[] = [],
   This = void
-> = (this: This, ...args: Args) => R
+> = (this: This, ...args: Args) => R;
 
-export type Return<F extends Fn<any, any>> = F extends Fn<infer Res> ? Res : never
-export type Param<F> = F extends Fn<any, infer Args> ? Args : never
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+export type Return<F extends Fn<any, any>> = F extends Fn<infer Res>
+  ? Res
+  : never;
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+export type Param<F> = F extends Fn<any, infer Args> ? Args : never;
 
-export type Debug<Name extends string, T> = [Name, T]
+export type Debug<
+  T,
+  Name extends string | undefined = undefined
+> = Name extends string ? `${Name}: ${T}` : `${T}`;
