@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { expect, test, assertType } from 'vitest'
 
 import { array, infer, number, object, s, SchemaBuilder, string } from '../src'

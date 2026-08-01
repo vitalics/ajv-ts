@@ -1,6 +1,5 @@
-import * as s from './builder'
-export * from './builder'
-export * as SchemaType from './schema/types'
+import * as s from "./builder/api";
+export * from "./builder/api";
 
-export * as s from './builder'
-export default s
+export * as s from "./builder/api";
+export default s;

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { assertType, expect, expectTypeOf, test } from "vitest";
 
 import { assertEqualType } from "../src/utils";

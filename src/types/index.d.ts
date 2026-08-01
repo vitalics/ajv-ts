@@ -1,4 +1,5 @@
 export * as Array from "./array";
+export * as ArrayObject from "./arrayObject";
 export * as Boolean from "./boolean";
 export * from "./misc";
 export * as Number from "./number";

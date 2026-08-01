@@ -65,6 +65,7 @@
   - [`never`](#never)
   - [`not`/`exclude`](#notexclude)
   - [Custom Ajv instance](#custom-ajv-instance)
+  - [Standard Schema](#standard-schema)
   - [`custom` shema definition](#custom-shema-definition)
   - [Transformations](#transformations)
     - [Preprocess](#preprocess)
@@ -548,7 +549,7 @@ nullableString.parse(undefined); // throws error
 ## Objects
 
 ```ts
-// all properties are required by default
+// make object of dog
 const Dog = s.object({
   name: s.string(),
   age: s.number(),
@@ -559,10 +560,12 @@ type Dog = s.infer<typeof Dog>;
 
 // equivalent to:
 type Dog = {
-  name: string;
-  age: number;
+  name?: string;
+  age?: number;
 };
 ```
+
+**NOTE:** all properties are optional by default. See [JSON-Schema spec](https://json-schema.org/understanding-json-schema/reference/object#properties)
 
 ### `.keyof`
 
@@ -1056,6 +1059,24 @@ export const s = schemaBuilder.create(myAjvInstance)
 // later:
 s.string().dateTime().parse(new Date()) // 2023-10-05T19:31:57.610Z
 ```
+
+## Standard Schema
+
+Every schema builder implements the [Standard Schema](https://standardschema.dev) interface (`StandardSchemaV1`), so schemas can be passed to any Standard Schema-compatible tool (form libraries, tRPC, etc.) without adapters.
+
+```ts
+import type { StandardSchemaV1 } from '@standard-schema/spec'
+
+const schema = s.object({ name: s.string() })
+
+const standard: StandardSchemaV1 = schema // OK
+
+standard['~standard'].validate({ name: 'John' }) // { value: { name: 'John' } }
+standard['~standard'].validate({ name: 42 })
+// { issues: [{ message: 'must be string', path: ['name'] }] }
+```
+
+Ajv errors are mapped to Standard Schema `issues`, `instancePath` (JSON-pointer) becomes the issue `path` segments.
 
 ## `custom` shema definition
 

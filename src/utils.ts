@@ -1,3 +1,3 @@
-import { Boolean } from './types/index';
+import type { Boolean as _Boolean } from "./types/index";
 
-export const assertEqualType = <A, B>(val: Boolean.Equals<A, B>) => val;
+export const assertEqualType = <A, B>(val: _Boolean.Equals<A, B>) => val;

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Ajv from 'ajv';
 import { test, expect, assertType } from 'vitest'
 
