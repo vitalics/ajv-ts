@@ -5,10 +5,42 @@ import addFormats from "ajv-formats";
 
 import type { AnySchema, AnySchemaOrAnnotation } from "../schema/types";
 import type { TError } from "../types/errors";
+import type { HaveKey } from "../types/object";
 
 export type SafeParseResult<T, E extends Error | TError | string = Error> =
   | SafeParseSuccessResult<T>
   | SafeParseErrorResult<T, E>;
+
+/**
+ * Resolves to `true` when the schema is marked with `$async: true`
+ * (see {@link SchemaBuilder.async async}).
+ *
+ * Broad schemas (`any`, `AnySchemaOrAnnotation`) resolve to `false` so
+ * `safeParse`/`parse`/`validate` keep their sync signatures there.
+ *
+ * Re-toggling (`async().sync()` / `sync().async()`) intersects the flag into
+ * `never`; such schemas are treated as sync (`false`).
+ */
+export type IsSchemaAsync<Schema> = AnySchemaOrAnnotation extends Schema
+  ? false
+  : HaveKey<Schema, "$async"> extends true
+    ? [(Schema & Record<"$async", boolean>)["$async"]] extends [never]
+      ? false
+      : (Schema & Record<"$async", boolean>)["$async"] extends true
+        ? true
+        : false
+    : false;
+
+/**
+ * Sets the `$async` flag in the schema type.
+ *
+ * Broad schemas (`any`, `AnySchemaOrAnnotation`) are kept as-is so concrete
+ * builders stay assignable to {@link AnySchemaBuilder}.
+ */
+type WithAsyncFlag<
+  Schema,
+  Flag extends boolean,
+> = AnySchemaOrAnnotation extends Schema ? Schema : Schema & { $async: Flag };
 
 export type SafeParseSuccessResult<T> = {
   success: true;
@@ -109,14 +141,29 @@ export abstract class SchemaBuilder<
 
   /**
    * `StandardSchemaV1` `validate` implementation. Uses {@link SchemaBuilder.safeParse safeParse} under the hood.
+   *
+   * Returns a `Promise` for schemas marked with `$async` (see {@link SchemaBuilder.async async}).
    * @see {@link https://standardschema.dev standard schema spec}
    */
-  private _standardValidate(value: unknown): StandardSchemaV1.Result<Output> {
-    const result = this.safeParse(value);
-    if (result.success) {
-      return { value: result.data };
+  private _standardValidate(
+    value: unknown,
+  ):
+    | StandardSchemaV1.Result<Output>
+    | Promise<StandardSchemaV1.Result<Output>> {
+    const toResult = (
+      result: SafeParseResult<Output>,
+    ): StandardSchemaV1.Result<Output> =>
+      result.success
+        ? { value: result.data }
+        : { issues: toStandardIssues(result.error) };
+
+    const result = this.safeParse(value) as
+      | SafeParseResult<Output>
+      | Promise<SafeParseResult<Output>>;
+    if (result instanceof Promise) {
+      return result.then(toResult);
     }
-    return { issues: toStandardIssues(result.error) };
+    return toResult(result);
   }
 
   set schema(schema) {
@@ -228,21 +275,26 @@ export abstract class SchemaBuilder<
 
   /**
    * Mark schema as async (`$async=true`).
+   *
+   * After this call {@link SchemaBuilder.safeParse safeParse}, {@link SchemaBuilder.parse parse}
+   * and {@link SchemaBuilder.validate validate} return a `Promise`.
    */
-  async(): this {
+  async(): SchemaBuilder<Input, WithAsyncFlag<Schema, true>, Output> {
     (this.schema as Record<string, unknown>).$async = true;
-    return this;
+    return this as never;
   }
 
   /**
    * Mark schema as sync (`$async=false`).
    */
-  sync(remove: boolean = false): this {
+  sync(
+    remove: boolean = false,
+  ): SchemaBuilder<Input, WithAsyncFlag<Schema, false>, Output> {
     (this.schema as Record<string, unknown>).$async = false;
     if (remove) {
       delete (this.schema as Record<string, unknown>).$async;
     }
-    return this;
+    return this as never;
   }
 
   /**
@@ -457,22 +509,33 @@ export abstract class SchemaBuilder<
   }
 
   /**
-   * Parse you input result. Used `ajv.validate` under the hood
-   *
-   * It also applies your `postProcess` functions if parsing was successfull
+   * Same as {@link SchemaBuilder._safeParseRaw _safeParseRaw}, but for `$async` schemas:
+   * the compiled Ajv validate function returns a `Promise` and rejects with a
+   * `ValidationError` (`errors` list) when the input is invalid.
    */
-  safeParse(input?: unknown): SafeParseResult<Output> {
-    let value: unknown = input;
-    for (const fn of this._preFns) {
-      value = fn(value);
+  protected async _safeParseRawAsync(
+    input?: unknown,
+  ): Promise<SafeParseResult<unknown>> {
+    try {
+      const validateFn = this._ajv.compile(this.schema);
+      await validateFn(input);
+      return { data: input, success: true };
+    } catch (e) {
+      const ajvError = e as { errors?: ErrorObject[]; message?: string };
+      return {
+        error: new Error(ajvError.errors?.at(0)?.message ?? ajvError.message, {
+          cause: ajvError.errors ?? e,
+        }),
+        success: false,
+        data: undefined,
+      };
     }
+  }
 
-    const result = this._safeParseRaw(value);
-    if (!result.success) {
-      return result as SafeParseResult<Output>;
-    }
-
-    let data: any = result.data;
+  /**
+   * Applies `postprocess` and `refine` functions to successfully validated data.
+   */
+  private _applyPostAndRefine(data: unknown): SafeParseResult<Output> {
     for (const fn of this._postFns) {
       data = fn(data);
     }
@@ -485,27 +548,73 @@ export abstract class SchemaBuilder<
             success: false,
             error: new Error("refine error", { cause: res }),
             data: undefined,
-          } as SafeParseResult<Output>;
+          };
         }
       } catch (e) {
         return {
           success: false,
           error: e instanceof Error ? e : new Error(String(e)),
           data: undefined,
-        } as SafeParseResult<Output>;
+        };
       }
     }
 
-    return { success: true, data } as SafeParseResult<Output>;
+    return { success: true, data: data as Output };
+  }
+
+  /**
+   * Parse you input result. Used `ajv.validate` under the hood
+   *
+   * It also applies your `postProcess` functions if parsing was successfull
+   *
+   * Returns a `Promise` for schemas marked with `$async` (see {@link SchemaBuilder.async async}).
+   */
+  safeParse(
+    input?: unknown,
+  ): IsSchemaAsync<Schema> extends true
+    ? Promise<SafeParseResult<Output>>
+    : SafeParseResult<Output> {
+    let value: unknown = input;
+    for (const fn of this._preFns) {
+      value = fn(value);
+    }
+
+    if ((this.schema as { $async?: boolean }).$async === true) {
+      return this._safeParseRawAsync(value).then((result) =>
+        result.success
+          ? this._applyPostAndRefine(result.data)
+          : (result as SafeParseResult<Output>),
+      ) as never;
+    }
+
+    const result = this._safeParseRaw(value);
+    if (!result.success) {
+      return result as never;
+    }
+    return this._applyPostAndRefine(result.data) as never;
   }
   /**
    * Parse input for given schema.
    *
+   * Returns a `Promise` for schemas marked with `$async` (see {@link SchemaBuilder.async async}).
+   *
    * @returns {Output} parsed output result.
    * @throws `Error` when input not match given schema
    */
-  parse(input?: unknown): Output {
-    const parsed = this.safeParse(input);
+  parse(
+    input?: unknown,
+  ): IsSchemaAsync<Schema> extends true ? Promise<Output> : Output {
+    const parsed = this.safeParse(input) as
+      | SafeParseResult<Output>
+      | Promise<SafeParseResult<Output>>;
+    if (parsed instanceof Promise) {
+      return parsed.then((result) => {
+        if (result.success) {
+          return result.data;
+        }
+        throw result.error;
+      }) as never;
+    }
     if (parsed.success) {
       return parsed.data as never;
     }
@@ -514,10 +623,19 @@ export abstract class SchemaBuilder<
   /**
    * Validate your schema.
    *
+   * Returns a `Promise` for schemas marked with `$async` (see {@link SchemaBuilder.async async}).
+   *
    * @returns {boolean} Validity of your schema
    */
-  validate(input?: unknown): boolean {
-    const parsed = this.safeParse(input);
+  validate(
+    input?: unknown,
+  ): IsSchemaAsync<Schema> extends true ? Promise<boolean> : boolean {
+    const parsed = this.safeParse(input) as
+      | SafeParseResult<Output>
+      | Promise<SafeParseResult<Output>>;
+    if (parsed instanceof Promise) {
+      return parsed.then((result) => result.success) as never;
+    }
     return parsed.success as never;
   }
 }
@@ -550,31 +668,3 @@ export type SchemaToBuilder<
   Sb extends AnySchemaBuilder,
   S extends AnySchemaOrAnnotation = GetSchema<Sb>,
 > = unknown;
-
-type SchemaObjectToType<S extends AnySchemaOrAnnotation> = S extends {
-  type: "number" | "string" | "null";
-}
-  ? S["type"] extends number
-    ? number
-    : S["type"] extends "string"
-      ? string
-      : S["type"] extends "null"
-        ? null
-        : // S['type'] extends 'object' ? Record<any, any> :
-          // S extends { type: 'array' }? :
-          S extends {
-              type: "object";
-              properties?: Record<string, AnySchemaOrAnnotation>;
-            }
-          ? S["properties"][keyof S["properties"]]
-          : [unknown, "not matched"]
-  : [unknown, "end"];
-// export type SchemaToType<
-//   Sb extends AnySchemaBuilder,
-//   S extends AnySchemaOrAnnotation = GetSchema<Sb>
-// > = S extends { type: "number" | "string" | "null" | "object" | "array" }
-//   ? S["type"] extends number
-//     ? number
-//     : S["type"]
-//   : any;
-type T = SchemaObjectToType<{ type: "number" }>;

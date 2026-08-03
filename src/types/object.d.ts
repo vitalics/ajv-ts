@@ -37,6 +37,10 @@ export type OptionalByKey<T, K extends keyof T> = Omit<T, K> & {
 
 export type InferKeys<T> = T extends Record<infer K, any> ? K : never;
 
+export type HaveKey<T, K extends PropertyKey> = K extends keyof T
+  ? true
+  : false;
+
 export type OptionalUndefined2<T, Keys extends keyof T = keyof T> = SetOptional<
   T,
   Keys

@@ -57,7 +57,7 @@ class ObjectSchemaBuilder<
    * Same as `s.array(s.object(...))`.
    */
   array(): ArraySchemaBuilder<Schema> {
-    return array(this);
+    return array(this as never) as never;
   }
 
   /**

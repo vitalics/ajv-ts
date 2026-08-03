@@ -2,6 +2,7 @@ import Ajv from "ajv";
 import { expectTypeOf } from "expect-type";
 import { assertType, test } from "vitest";
 import s from "../src";
+import type { SafeParseResult } from "../src/builder/base";
 
 test("infer and input helpers match output", () => {
   const str = s.string();
@@ -60,22 +61,38 @@ test("readonly adds readOnly", () => {
   assertType<{ readonly type: "string"; readonly readOnly: true }>(str._schema);
 });
 
-test("async/sync do not change schema type", () => {
+test("async/sync toggle $async in schema type", () => {
   const asyncStr = s.string().async();
-  assertType<{ readonly type: "string" }>(asyncStr._schema);
+  assertType<{ readonly type: "string" } & { $async: true }>(asyncStr._schema);
 
   const syncStr = asyncStr.sync();
-  assertType<{ readonly type: "string" }>(syncStr._schema);
+  assertType<{ readonly type: "string" } & { $async: false }>(syncStr._schema);
 
   const removed = syncStr.sync(true);
-  assertType<{ readonly type: "string" }>(removed._schema);
+  assertType<{ readonly type: "string" } & { $async: false }>(removed._schema);
+});
+
+test("async makes safeParse/parse/validate return promises", () => {
+  const syncStr = s.string();
+  expectTypeOf(syncStr.safeParse("x")).toEqualTypeOf<SafeParseResult<string>>();
+  expectTypeOf(syncStr.parse("x")).toEqualTypeOf<string>();
+  expectTypeOf(syncStr.validate("x")).toEqualTypeOf<boolean>();
+
+  const asyncStr = s.string().async();
+  expectTypeOf(asyncStr.safeParse("x")).toEqualTypeOf<
+    Promise<SafeParseResult<string>>
+  >();
+  expectTypeOf(asyncStr.parse("x")).toEqualTypeOf<Promise<string>>();
+  expectTypeOf(asyncStr.validate("x")).toEqualTypeOf<Promise<boolean>>();
+
+  const backToSync = asyncStr.sync();
+  expectTypeOf(backToSync.safeParse("x")).toEqualTypeOf<
+    SafeParseResult<string>
+  >();
 });
 
 test("fromJSON merges extra schema properties", () => {
-  const merged = s.fromJSON(
-    { type: "string", title: "Example" } as never,
-    s.string(),
-  );
+  const merged = s.fromJSON({ type: "string", title: "Example" }, s.string());
   assertType<{ readonly type: "string"; readonly title: string }>(
     merged._schema,
   );
