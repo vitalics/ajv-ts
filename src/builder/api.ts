@@ -1,7 +1,7 @@
 import Ajv from "ajv";
 
 import { array } from "./array";
-import { type AnySchemaBuilder, SchemaBuilder } from "./base";
+import { type AnySchemaBuilder, Infer, SchemaBuilder } from "./base";
 import { bool } from "./boolean";
 import { constant, literal } from "./constant";
 import { makeEnum } from "./enum";
@@ -13,6 +13,7 @@ import { string } from "./string";
 import { or } from "./union";
 
 import type { AnySchemaOrAnnotation } from "../schema/types";
+import { OmitUndefined } from "../types/object";
 import type { InferOutputType, InferSchemaType } from "./types";
 
 class UnknownSchemaBuilder<T extends unknown | any> extends SchemaBuilder<
@@ -37,16 +38,21 @@ function unknown(): SchemaBuilder<unknown, AnySchemaOrAnnotation, unknown> {
   return new UnknownSchemaBuilder<unknown>();
 }
 
-function fromJSON(
-  schema: AnySchemaOrAnnotation,
-  defaults?: AnySchemaBuilder,
-): AnySchemaBuilder {
+function fromJSON<
+  const Schema extends AnySchemaOrAnnotation = AnySchemaOrAnnotation,
+  const DefaultsBuilder extends AnySchemaBuilder = AnySchemaBuilder,
+>(
+  schema: Schema,
+  defaults?: DefaultsBuilder,
+): SchemaBuilder<
+  DefaultsBuilder["_input"],
+  InferSchemaType<DefaultsBuilder> & OmitUndefined<Schema>,
+  Infer<DefaultsBuilder>
+> {
   const merged = defaults
     ? { ...(defaults.schema as object), ...(schema as object) }
     : schema;
-  return new UnknownSchemaBuilder(
-    merged as AnySchemaOrAnnotation,
-  ) as AnySchemaBuilder;
+  return new UnknownSchemaBuilder(merged as AnySchemaOrAnnotation) as never;
 }
 
 type Api = {

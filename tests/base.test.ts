@@ -149,14 +149,14 @@ test('should throws for "undefined" value for nullable schema', () => {
   expect(() => str.parse(undefined)).toThrow(Error);
 });
 
-test("async schema", () => {
+test("async schema", async () => {
   const Schema = s
     .object({
       name: s.string(),
     })
     .async();
 
-  const a = Schema.parse({ name: "hello" });
+  const a = await Schema.parse({ name: "hello" });
   expect(Schema.schema).toMatchObject({
     type: "object",
     $async: true,
@@ -166,6 +166,65 @@ test("async schema", () => {
   });
 
   expect(a.name).toBe("hello");
+});
+
+test("async schema safeParse returns a promise", async () => {
+  const Schema = s.object({ name: s.string() }).async();
+
+  const result = Schema.safeParse({ name: "hello" });
+  expect(result).toBeInstanceOf(Promise);
+
+  const resolved = await result;
+  expect(resolved.success).toBe(true);
+  if (resolved.success) {
+    expect(resolved.data).toEqual({ name: "hello" });
+  }
+});
+
+test("async schema safeParse resolves with error for invalid input", async () => {
+  const Schema = s.object({ name: s.string() }).async();
+
+  const resolved = await Schema.safeParse({ name: 123 });
+  expect(resolved.success).toBe(false);
+  if (!resolved.success) {
+    expect(resolved.error).toBeInstanceOf(Error);
+  }
+});
+
+test("async schema parse rejects for invalid input", async () => {
+  const Schema = s.object({ name: s.string() }).async();
+
+  await expect(Schema.parse({ name: 123 })).rejects.toThrow(Error);
+});
+
+test("async schema validate returns a promise of boolean", async () => {
+  const Schema = s.object({ name: s.string() }).async();
+
+  await expect(Schema.validate({ name: "hello" })).resolves.toBe(true);
+  await expect(Schema.validate({ name: 123 })).resolves.toBe(false);
+});
+
+test("async schema applies preprocess/postprocess/refine", async () => {
+  const Schema = s
+    .string()
+    .async()
+    .preprocess((value) => (typeof value === "number" ? String(value) : value))
+    .postprocess((value) => value.toUpperCase());
+
+  const resolved = await Schema.safeParse(123);
+  expect(resolved).toMatchObject({ success: true, data: "123" });
+
+  const refined = s
+    .string()
+    .async()
+    .refine((value) => (value === "forbidden" ? "not allowed" : undefined));
+  await expect(refined.safeParse("forbidden")).resolves.toMatchObject({
+    success: false,
+  });
+  await expect(refined.safeParse("allowed")).resolves.toMatchObject({
+    success: true,
+    data: "allowed",
+  });
 });
 
 test("make sync schema", () => {
