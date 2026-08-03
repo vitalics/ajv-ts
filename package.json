@@ -1,7 +1,7 @@
 {
   "name": "ajv-ts",
   "description": "JSON-schema builder with typescript safety",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -11,14 +11,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check",
-    "lint:fix": "biome check --write .",
-    "lint:ci": "biome ci",
+    "lint:fix": "biome check --write src/ tests/",
+    "lint:ci": "biome ci src/ tests/",
     "ci:version": "changeset version",
     "ci:publish": "changeset publish"
   },
   "author": "Vitali Haradkou <vitalicset@yandex.ru>",
   "homepage": "https://github.com/vitalics/ajv-ts",
-  "keywords": ["ajv", "validation", "json-schema", "typescript", "builder"],
+  "keywords": [
+    "ajv",
+    "validation",
+    "json-schema",
+    "typescript",
+    "builder"
+  ],
   "bugs": {
     "url": "https://github.com/vitalics/ajv-ts/issues",
     "email": "vitalicset@yandex.ru"
