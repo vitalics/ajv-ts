@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "lint": "biome check",
     "lint:fix": "biome check --write src/ tests/",
-    "lint:ci": "biome ci",
+    "lint:ci": "biome ci src/ tests/",
     "ci:version": "changeset version",
     "ci:publish": "changeset publish"
   },
