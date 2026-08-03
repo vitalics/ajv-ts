@@ -1,5 +1,49 @@
 # ajv-ts
 
+## 0.10.0
+
+### Minor Changes
+
+- [#72](https://github.com/vitalics/ajv-ts/pull/72) [`7741ecc`](https://github.com/vitalics/ajv-ts/commit/7741ecc197bc9f126bfd56d50987f14216e12d95) Thanks [@vitalics](https://github.com/vitalics)! - feat: support [Standard Schema](https://standardschema.dev). Every schema builder now exposes the `~standard` property (`StandardSchemaV1`), so schemas can be passed to any Standard Schema-compatible tool without adapters.
+
+  Example:
+
+  ```ts
+  import type { StandardSchemaV1 } from "@standard-schema/spec";
+
+  const schema = s.object({ name: s.string() });
+
+  const standard: StandardSchemaV1 = schema; // OK
+
+  standard["~standard"].validate({ name: "John" }); // { value: { name: "John" } }
+  standard["~standard"].validate({ name: 42 }); // { issues: [{ message: "must be string", path: ["name"] }] }
+  ```
+
+### Patch Changes
+
+- [#72](https://github.com/vitalics/ajv-ts/pull/72) [`7741ecc`](https://github.com/vitalics/ajv-ts/commit/7741ecc197bc9f126bfd56d50987f14216e12d95) Thanks [@vitalics](https://github.com/vitalics)! - Release prep: restored APIs, new builders, bug fixes, and minimal object schemas.
+
+  - Restored `error()`, `meta()`, `preprocess()`, `postprocess()`, `refine()`, `async()`, `sync()`, the `ajv` getter, and the `shape` setter on `SchemaBuilder`.
+  - Restored top-level exports: `keyof`, `fromJSON`, `const`/`literal`, `never`, `not`, `union`, `infer`, `any`, and `unknown`.
+  - Added `ConstantSchemaBuilder` (`s.const` / `s.literal`) and `NotSchemaBuilder` (`s.not` / `s.never`).
+  - Fixed `nullable()` so it no longer nests `type` arrays or duplicates `null`.
+  - Fixed `multipleOf()` / `step()` to use `Math.abs(value)` and produce valid Ajv schemas.
+  - Fixed `examples()` to flatten a single array argument instead of double-wrapping it.
+  - Reworked `ObjectSchemaBuilder` so default and derived schemas are minimal (only `type`, `properties`, and `required` when relevant; no extra `undefined`-valued keys).
+  - Added `.and()` alias for merging/extending object schemas.
+  - Added comprehensive `*.types.test.ts` compile-time type tests.
+  - Added `// @ts-nocheck` to legacy runtime tests whose loose type assertions are now invalid under stricter builder generics.
+
+- [#75](https://github.com/vitalics/ajv-ts/pull/75) [`93db5f5`](https://github.com/vitalics/ajv-ts/commit/93db5f54cda116435a6eb851957e66bfd6616782) Thanks [@vitalics](https://github.com/vitalics)! - Tooling: finalize Biome migration and fix array type-level bugs.
+
+  - Migrated the whole codebase to the Biome formatter with 2-space indentation (`indentStyle: "space"`) and removed the leftover `.eslintrc.json`.
+  - Added the `lint:fix` script (`biome check --write .`).
+  - Fixed the build loop: `tsup.config.mts` now passes `config: false` so tsup no longer rebuilds its own config file when executed via `tsx`.
+  - Fixed `ArraySchemaBuilder.readonly()` type inference: tuple results with `prefixItems` now keep the readonly modifier instead of recursing through `MakeReadonly`.
+  - Fixed `ArraySchemaBuilder.minLength()` to preserve the `Output` generic in its return type.
+  - `readonly()` is now documented as also setting `unevaluatedItems: false` (JSON Schema draft 2020-12, section 11.2).
+  - `tsconfig.json`: dropped `downlevelIteration` and narrowed `include` to `src/*` + `tests`.
+
 ## 0.9.0
 
 ### Minor Changes
