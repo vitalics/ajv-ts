@@ -7,14 +7,14 @@ class UnionSchemaBuilder<
   const Schema extends CombinedSchema = {
     readonly anyOf: S[number]["schema"];
     readonly type: S[number]["schema"]["type"];
-  }
+  },
 > extends SchemaBuilder<Infer<El>, Schema, Infer<S[number]>> {
   constructor(...schemas: S) {
     const types = [
       ...new Set(
         schemas
           .map((s) => s.schema.type)
-          .filter((t): t is string => typeof t === "string")
+          .filter((t): t is string => typeof t === "string"),
       ),
     ];
     const schema: Record<string, unknown> = {
@@ -29,7 +29,7 @@ class UnionSchemaBuilder<
 
 export function or<
   const El extends AnySchemaBuilder = AnySchemaBuilder,
-  const S extends readonly El[] = readonly El[]
+  const S extends readonly El[] = readonly El[],
 >(...defs: S) {
   return new UnionSchemaBuilder<El, S>(...defs);
 }

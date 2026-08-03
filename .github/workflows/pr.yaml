@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node_version: [18, 20, 22, latest]
-        pnpm_version: [9.10.0]
+        node_version: [22, 24, latest]
+        pnpm_version: [11.18.0]
     steps:
       - name: Clone repository
         uses: actions/checkout@v3
@@ -28,6 +28,8 @@ jobs:
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install
+      - name: Lint
+        run: pnpm lint:ci
       - name: Generate build
         run: pnpm build
       - name: Run Tests
@@ -46,5 +48,6 @@ jobs:
         with:
           bun-version: ${{matrix.bun_version}}
       - run: bun install
+      - run: bun run lint:ci
       - run: bun run build
       - run: bun run test

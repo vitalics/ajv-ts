@@ -1,20 +1,20 @@
 import type {
   And,
+  GreaterThan,
   GreaterThanOrEqual,
   IsFloat,
   IsInteger,
+  LessThan,
   LessThanOrEqual,
   Or,
   SetOptional,
-  GreaterThan,
-  LessThan,
 } from "type-fest";
 
 import type { NumberSchema } from "../schema/types";
-import { SchemaBuilder } from "./base";
+import type { Debug } from "../types";
 import type { TTypeError, TTypeErrorNotSame } from "../types/errors";
 import type { OmitMany, OmitUndefined, Prettify } from "../types/object";
-import type { Debug } from "../types";
+import { SchemaBuilder } from "./base";
 
 type NumberSchemaOpts = {
   readonly type: "number" | "integer";
@@ -48,7 +48,7 @@ type DefaultNumberOpts = {
 class NumberSchemaBuilder<
   const Input extends number = number,
   const Schema extends NumberSchema = DefaultNumberSchema,
-  const Opts extends NumberSchemaOpts = DefaultNumberOpts
+  const Opts extends NumberSchemaOpts = DefaultNumberOpts,
 > extends SchemaBuilder<number, Schema, Input> {
   constructor(schema?: SetOptional<Schema, "type">) {
     super({ ...schema, type: "number" } as never);
@@ -98,11 +98,11 @@ class NumberSchemaBuilder<
       ? Format extends "int32"
         ? true
         : Format extends "int64"
-        ? true
-        : // type=int. Format float or doouble
-          false
+          ? true
+          : // type=int. Format float or doouble
+            false
       : // Rest
-        true
+        true,
   >(
     format: FormatValid extends true
       ? Format
@@ -111,9 +111,9 @@ class NumberSchemaBuilder<
           ["Expected:", '"int32" or "int64"', "Given:", Format],
           [
             Debug<Opts["type"], "Schema Type">,
-            Debug<FormatValid, `Format Valid`>
+            Debug<FormatValid, `Format Valid`>,
           ]
-        >
+        >,
   ): NumberSchemaBuilder<
     Input,
     Prettify<
@@ -149,8 +149,8 @@ class NumberSchemaBuilder<
     FormatValid extends boolean = Opts["format"] extends "int32"
       ? IsInteger<N>
       : Opts["format"] extends "int64"
-      ? IsInteger<N>
-      : Or<IsFloat<N>, IsInteger<N>>,
+        ? IsInteger<N>
+        : Or<IsFloat<N>, IsInteger<N>>,
     ValueValid extends boolean = Opts["maxValue"] extends number
       ? Opts["minValue"] extends number
         ? And<
@@ -158,7 +158,7 @@ class NumberSchemaBuilder<
             GreaterThanOrEqual<N, Opts["minValue"]>
           >
         : LessThanOrEqual<N, Opts["maxValue"]>
-      : true
+      : true,
   >(
     value: TypeValid extends true
       ? FormatValid extends true
@@ -171,7 +171,7 @@ class NumberSchemaBuilder<
                 Debug<Opts["format"], "Schema Format">,
                 Debug<TypeValid, `Type Valid`>,
                 Debug<FormatValid, `Format Valid`>,
-                Debug<ValueValid, `Value Valid`>
+                Debug<ValueValid, `Value Valid`>,
               ]
             >
         : TTypeError<
@@ -182,14 +182,14 @@ class NumberSchemaBuilder<
               Debug<Opts["format"], "Schema Format">,
               Debug<TypeValid, `Type Valid`>,
               Debug<FormatValid, `Format Valid`>,
-              Debug<ValueValid, `Value Valid`>
+              Debug<ValueValid, `Value Valid`>,
             ]
           >
       : TTypeError<
           `Type invalid.`,
           ["Expected:", Input, "Got:", N],
           [Debug<TypeValid, `Type Valid`>, Debug<FormatValid, `Format Valid`>]
-        >
+        >,
   ): NumberSchemaBuilder<
     N,
     Prettify<
@@ -232,10 +232,10 @@ class NumberSchemaBuilder<
     FormatValid extends boolean = Opts["format"] extends undefined
       ? true
       : Opts["format"] extends "int32"
-      ? IsInteger<Min>
-      : Opts["format"] extends "int64"
-      ? IsInteger<Input>
-      : Or<IsFloat<Min>, IsInteger<Min>>
+        ? IsInteger<Min>
+        : Opts["format"] extends "int64"
+          ? IsInteger<Input>
+          : Or<IsFloat<Min>, IsInteger<Min>>,
   >(
     minValue: MinLengthValid extends true
       ? TypeValid extends true
@@ -247,7 +247,7 @@ class NumberSchemaBuilder<
               [
                 Debug<MinLengthValid, `Min Length Valid`>,
                 Debug<TypeValid, `Type Valid`>,
-                Debug<FormatValid, `Format Valid`>
+                Debug<FormatValid, `Format Valid`>,
               ]
             >
         : TTypeError<
@@ -256,7 +256,7 @@ class NumberSchemaBuilder<
             [
               Debug<MinLengthValid, "MinLength valid">,
               Debug<TypeValid, `Type Valid`>,
-              Debug<FormatValid, `Format Valid`>
+              Debug<FormatValid, `Format Valid`>,
             ]
           >
       : TTypeErrorNotSame<
@@ -265,10 +265,10 @@ class NumberSchemaBuilder<
           [
             Debug<MinLengthValid, "MinLength valid">,
             Debug<TypeValid, `Type Valid`>,
-            Debug<FormatValid, `Format Valid`>
+            Debug<FormatValid, `Format Valid`>,
           ]
         >,
-    exclusive: Exclusive = false as Exclusive
+    exclusive: Exclusive = false as Exclusive,
   ): NumberSchemaBuilder<
     Input,
     Prettify<
@@ -316,18 +316,18 @@ class NumberSchemaBuilder<
     FormatValid extends boolean = Opts["format"] extends undefined
       ? true
       : IsInteger<Max> extends true
-      ? Opts["format"] extends "int32"
-        ? true
-        : Opts["format"] extends "int64"
-        ? true
-        : false
-      : true,
+        ? Opts["format"] extends "int32"
+          ? true
+          : Opts["format"] extends "int64"
+            ? true
+            : false
+        : true,
     TypeValid extends boolean = Opts["type"] extends "integer"
       ? IsInteger<Max>
       : Or<IsFloat<Max>, IsInteger<Max>>,
     MinLengthValid extends boolean = Opts["minValue"] extends number
       ? LessThan<Opts["minValue"], Max>
-      : true
+      : true,
   >(
     max: MinLengthValid extends true
       ? TypeValid extends true
@@ -339,7 +339,7 @@ class NumberSchemaBuilder<
               [
                 Debug<MinLengthValid, "MinLength valid">,
                 Debug<TypeValid, `Type Valid`>,
-                Debug<FormatValid, `Format Valid`>
+                Debug<FormatValid, `Format Valid`>,
               ]
             >
         : TTypeError<
@@ -348,7 +348,7 @@ class NumberSchemaBuilder<
             [
               Debug<MinLengthValid, "MinLength valid">,
               Debug<TypeValid, `Type Valid`>,
-              Debug<FormatValid, `Format Valid`>
+              Debug<FormatValid, `Format Valid`>,
             ]
           >
       : TTypeErrorNotSame<
@@ -357,10 +357,10 @@ class NumberSchemaBuilder<
           [
             Debug<MinLengthValid, "MinLength valid">,
             Debug<TypeValid, `Type Valid`>,
-            Debug<FormatValid, `Format Valid`>
+            Debug<FormatValid, `Format Valid`>,
           ]
         >,
-    exclusive: Exclusive = false as Exclusive
+    exclusive: Exclusive = false as Exclusive,
   ): NumberSchemaBuilder<
     Input,
     Prettify<
@@ -457,7 +457,7 @@ class NumberSchemaBuilder<
    * The value must be a multiple of the given number.
    */
   multipleOf<const V extends number>(
-    value: V
+    value: V,
   ): NumberSchemaBuilder<
     Input,
     Prettify<
@@ -506,10 +506,9 @@ class NumberSchemaBuilder<
   /** Marks incoming number between `MAX_SAFE_INTEGER` and `MIN_SAFE_INTEGER` */
   safe() {
     return this.lte(Number.MAX_SAFE_INTEGER as 9007199254740991).gte(
-      Number.MIN_SAFE_INTEGER as -9007199254740991
+      Number.MIN_SAFE_INTEGER as -9007199254740991,
     );
   }
-
 }
 
 export function number<const N extends number = number>() {

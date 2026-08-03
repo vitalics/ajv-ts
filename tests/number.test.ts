@@ -1,6 +1,6 @@
-import { test, expect } from 'vitest'
+import { expect, test } from "vitest";
 
-import s from '../src'
+import s from "../src";
 
 const gtFive = s.number().gt(5);
 const gteFive = s.number().gte(5);
@@ -8,7 +8,7 @@ const minFive = s.number().minimum(5);
 const ltFive = s.number().lt(5);
 const lteFive = s.number().lte(5);
 const maxFive = s.number().max(5);
-const intNum = s.number().format('int32');
+const intNum = s.number().format("int32");
 const positive = s.number().positive();
 const negative = s.number().negative();
 const nonpositive = s.number().nonpositive();
@@ -72,79 +72,79 @@ test("failing validations", () => {
   expect(() => stepPointOne.parse(6.11)).toThrow();
   expect(() => stepPointOne.parse(6.1000000001)).toThrow();
   expect(() => stepSixPointFour.parse(6.41)).toThrow();
-  expect(() => stepPointseroseroseroOne.parse(3.01)).toThrow()
+  expect(() => stepPointseroseroseroOne.parse(3.01)).toThrow();
 });
 
 test("parse NaN", () => {
-  expect(() => s.number().parse(NaN)).toThrow();
+  expect(() => s.number().parse(Number.NaN)).toThrow();
 });
 
-test('number builder should pass only numbers', () => {
-  const schema = s.number()
+test("number builder should pass only numbers", () => {
+  const schema = s.number();
 
   expect(schema.schema).toMatchObject({
-    type: 'number'
-  })
-  expect(schema.validate("qwe")).toBe(false)
-  expect(schema.validate({})).toBe(false)
-  expect(schema.validate(null)).toBe(false)
-  expect(schema.validate(() => { })).toBe(false)
-  expect(schema.validate(123)).toBe(true)
-  expect(schema.validate(12.4)).toBe(true)
-})
+    type: "number",
+  });
+  expect(schema.validate("qwe")).toBe(false);
+  expect(schema.validate({})).toBe(false);
+  expect(schema.validate(null)).toBe(false);
+  expect(schema.validate(() => {})).toBe(false);
+  expect(schema.validate(123)).toBe(true);
+  expect(schema.validate(12.4)).toBe(true);
+});
 test('number builder "int32" format should supports only integers', () => {
-  const schema = s.number().format('int32').maximum(300)
+  const schema = s.number().format("int32").maximum(300);
 
   expect(schema.schema).toMatchObject({
-    type: 'number',
-    format: 'int32'
-  })
-  expect(schema.validate("qwe")).toBe(false)
-  expect(schema.validate({})).toBe(false)
-  expect(schema.validate(null)).toBe(false)
-  expect(schema.validate(() => { })).toBe(false)
-  expect(schema.validate(123)).toBe(true)
-  expect(schema.validate(400)).toBe(false)
-  expect(schema.validate(12.4)).toBe(false)
-})
+    type: "number",
+    format: "int32",
+  });
+  expect(schema.validate("qwe")).toBe(false);
+  expect(schema.validate({})).toBe(false);
+  expect(schema.validate(null)).toBe(false);
+  expect(schema.validate(() => {})).toBe(false);
+  expect(schema.validate(123)).toBe(true);
+  expect(schema.validate(400)).toBe(false);
+  expect(schema.validate(12.4)).toBe(false);
+});
 
-test('integer should supports only integers', () => {
-  const schema = s.integer().maximum(300)
+test("integer should supports only integers", () => {
+  const schema = s.integer().maximum(300);
 
   expect(schema.schema).toMatchObject({
-    type: 'integer',
-  })
-  expect(schema.validate("qwe")).toBe(false)
-  expect(schema.validate({})).toBe(false)
-  expect(schema.validate(null)).toBe(false)
-  expect(schema.validate(() => { })).toBe(false)
-  expect(schema.validate(123)).toBe(true)
-  expect(schema.validate(400)).toBe(false)
-  expect(schema.validate(12.4)).toBe(false)
-})
+    type: "integer",
+  });
+  expect(schema.validate("qwe")).toBe(false);
+  expect(schema.validate({})).toBe(false);
+  expect(schema.validate(null)).toBe(false);
+  expect(schema.validate(() => {})).toBe(false);
+  expect(schema.validate(123)).toBe(true);
+  expect(schema.validate(400)).toBe(false);
+  expect(schema.validate(12.4)).toBe(false);
+});
 
-test('incompatible format should fail type', () => {
+test("incompatible format should fail type", () => {
   // @ts-expect-error should fails
-  const schema1 = s.int().format('double')
+  const schema1 = s.int().format("double");
   // @ts-expect-error should fails
-  const schema2 = s.int().format('float')
+  const schema2 = s.int().format("float");
   // @ts-expect-error should fails
-  const schema3 = s.int().const(3.4)
-
-  // @ts-expect-error should fails
-  const schema4 = s.int().max(3.4)
-  // @ts-expect-error should fails
-  const schema5 = s.int().min(3.4)
-  // @ts-expect-error should fails
-  const schema6 = s.int().const(3.4)
-})
-
-test('ranges should fails for out of range', () => {
-  // @ts-expect-error should fails
-  s.int().min(1).max(3).const(-1)
+  const schema3 = s.int().const(3.4);
 
   // @ts-expect-error should fails
-  s.int().min(5).max(3)
+  const schema4 = s.int().max(3.4);
   // @ts-expect-error should fails
-  s.int().max(2).min(3)
-})
+  const schema5 = s.int().min(3.4);
+  // @ts-expect-error should fails
+  const schema6 = s.int().const(3.4);
+});
+
+test("ranges should fails for out of range", () => {
+  // @ts-expect-error should fails
+  s.int().min(1).max(3).const(-1);
+
+  // @ts-expect-error should fails
+  s.int().min(5).max(3);
+  // @ts-expect-error should fails
+  s.int().max(2).min(3);
+});

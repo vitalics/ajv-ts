@@ -307,7 +307,7 @@ export type ObjectSchema = BaseSchema & {
    * { } // valid
    * { "number": 1600, "street_name": "Pennsylvania", "street_type": "Avenue", "direction": "NW" } // valid for additional properties
    */
-  properties?: Record<string, AnySchemaOrAnnotation|undefined>;
+  properties?: Record<string, AnySchemaOrAnnotation | undefined>;
   /**
    * Sometimes you want to say that, given a particular kind of property name, the value should match
    * a particular schema. That’s where patternProperties comes in: it maps regular expressions to schemas.

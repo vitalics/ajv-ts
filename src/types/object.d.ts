@@ -35,7 +35,6 @@ export type OptionalByKey<T, K extends keyof T> = Omit<T, K> & {
   [Key in K]?: T[Key];
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 export type InferKeys<T> = T extends Record<infer K, any> ? K : never;
 
 export type OptionalUndefined2<T, Keys extends keyof T = keyof T> = SetOptional<
@@ -49,7 +48,7 @@ export type OptionalUndefined<
     ? undefined extends T[Props]
       ? Props
       : never
-    : never
+    : never,
 > = Prettify<
   Merge<
     {
@@ -84,7 +83,10 @@ export type OmitByValue<T, V> = {
   [K in keyof T as T[K] extends V ? never : K]: T[K];
 };
 
-export type PickMany<T, Fields extends readonly (keyof T | PropertyKey)[]> = Pick<T, Fields[number]>;
+export type PickMany<
+  T,
+  Fields extends readonly (keyof T | PropertyKey)[],
+> = Pick<T, Fields[number]>;
 
 export type RemoveReadonly<T, K extends keyof T> = T & {
   [P in K]-?: T[K];
@@ -103,10 +105,9 @@ export type IsOptional<T, K extends keyof T> = undefined extends Pick<T, K>[K]
 export type OmitUndefined<T> = {
   [K in keyof T as undefined extends T[K]
     ? never
-    : // biome-ignore lint/complexity/noBannedTypes: <explanation>
-    {} extends Pick<T, K>
-    ? never
-    : K]: T[K];
+    : {} extends Pick<T, K>
+      ? never
+      : K]: T[K];
 };
 
 export type RemoveUndefined<T> = OmitUndefined<T>;

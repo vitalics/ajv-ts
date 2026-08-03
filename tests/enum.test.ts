@@ -1,6 +1,6 @@
-import { test, expect, assertType } from 'vitest'
+import { assertType, expect, test } from "vitest";
 
-import s from '../src'
+import s from "../src";
 
 test("create enum", () => {
   const MyEnum = s.enum(["Red", "Green", "Blue"]);
@@ -12,9 +12,9 @@ test("create enum", () => {
 test("infer enum", () => {
   const MyEnum = s.enum(["Red", "Green", "Blue"]);
   type MyEnum = s.infer<typeof MyEnum>;
-  assertType<MyEnum>('Red')
-  assertType<MyEnum>('Green')
-  assertType<MyEnum>('Blue')
+  assertType<MyEnum>("Red");
+  assertType<MyEnum>("Green");
+  assertType<MyEnum>("Blue");
 });
 
 test("get options", () => {
@@ -25,13 +25,12 @@ test("readonly enum", () => {
   const HTTP_SUCCESS = ["200", "201"] as const;
   const arg = s.enum(HTTP_SUCCESS);
   type arg = s.infer<typeof arg>;
-  assertType<arg>('200')
-  assertType<arg>('201')
+  assertType<arg>("200");
+  assertType<arg>("201");
 
   arg.parse("201");
   expect(() => arg.parse("202")).toThrow();
 });
-
 
 test("nativeEnum test with consts", () => {
   const Fruits: { Apple: "apple"; Banana: "banana" } = {
@@ -44,8 +43,8 @@ test("nativeEnum test with consts", () => {
   fruitEnum.parse("banana");
   fruitEnum.parse(Fruits.Apple);
   fruitEnum.parse(Fruits.Banana);
-  assertType<s.infer<typeof fruitEnum>>("apple")
-  assertType<s.infer<typeof fruitEnum>>("banana")
+  assertType<s.infer<typeof fruitEnum>>("apple");
+  assertType<s.infer<typeof fruitEnum>>("banana");
 });
 
 test("nativeEnum test with real enum", () => {
@@ -59,7 +58,7 @@ test("nativeEnum test with real enum", () => {
   fruitEnum.parse("banana");
   fruitEnum.parse(Fruits.Apple);
   fruitEnum.parse(Fruits.Banana);
-  assertType<fruitEnum extends Fruits ? true : false>(true)
+  assertType<fruitEnum extends Fruits ? true : false>(true);
 });
 
 test("nativeEnum test with const with numeric keys", () => {
@@ -73,13 +72,13 @@ test("nativeEnum test with const with numeric keys", () => {
   fruitEnum.parse(20);
   fruitEnum.parse(FruitValues.Apple);
   fruitEnum.parse(FruitValues.Banana);
-  assertType<fruitEnum>(10)
-  assertType<fruitEnum>(20)
+  assertType<fruitEnum>(10);
+  assertType<fruitEnum>(20);
 });
 
 test("from enum", () => {
   enum Fruits {
-    Cantaloupe,
+    Cantaloupe = 0,
     Apple = "apple",
     Banana = "banana",
   }
@@ -114,21 +113,21 @@ test("from const", () => {
   expect(GreekEnum.enum.Alpha).toEqual("a");
 });
 
-test('#61 nullable enum', () => {
-  const sex = s.enum(['male', 'female']);
-  const nullableSex = s.enum(['male', 'female']).nullable();
+test("#61 nullable enum", () => {
+  const sex = s.enum(["male", "female"]);
+  const nullableSex = s.enum(["male", "female"]).nullable();
 
   const optionalNullableObj = s.object({
-    sex: s.enum(['male', 'female']).nullable().optional(),
+    sex: s.enum(["male", "female"]).nullable().optional(),
   });
 
-  expect(sex.parse('male')).toBe('male');
-  expect(sex.parse('female')).toBe('female');
+  expect(sex.parse("male")).toBe("male");
+  expect(sex.parse("female")).toBe("female");
   expect(sex.validate(null)).toBe(false);
   expect(sex.validate(undefined)).toBe(false);
 
-  expect(nullableSex.parse('male'),).toBe('male');
-  expect(nullableSex.parse('female'),).toBe('female');
+  expect(nullableSex.parse("male")).toBe("male");
+  expect(nullableSex.parse("female")).toBe("female");
   expect(nullableSex.validate(null)).toBe(true);
   expect(nullableSex.validate(undefined)).toBe(false);
-})
+});

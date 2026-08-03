@@ -6,7 +6,7 @@ export class NullSchemaBuilder<
   const Input = null,
   const Schema extends NullSchema = {
     readonly type: "null";
-  }
+  },
 > extends SchemaBuilder<Input, Schema> {
   constructor(schema?: SetOptional<Schema, "type">) {
     super({ ...schema, type: "null" } as never);

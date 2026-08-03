@@ -1,5 +1,5 @@
-import { SchemaBuilder } from "./base";
 import type { AnySchema } from "../schema/types";
+import { SchemaBuilder } from "./base";
 
 class AnySchemaBuilder extends SchemaBuilder<any, AnySchema, any> {
   constructor() {

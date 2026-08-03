@@ -57,7 +57,10 @@ test("requiredFor() adds only the requested keys", () => {
 test("requiredFor() appends new keys to existing required", () => {
   const str = s.string();
   const num = s.number();
-  const user = s.object({ name: str, age: num }).requiredFor("name").requiredFor("age");
+  const user = s
+    .object({ name: str, age: num })
+    .requiredFor("name")
+    .requiredFor("age");
   type Expected = {
     readonly type: "object";
     readonly properties: {
@@ -238,11 +241,7 @@ test("keyof() creates an enum of object keys", () => {
 
 test("chaining methods keeps the schema type minimal", () => {
   const str = s.string();
-  const user = s
-    .object({ name: str })
-    .required()
-    .strict()
-    .readonly();
+  const user = s.object({ name: str }).required().strict().readonly();
   type Expected = {
     readonly type: "object";
     readonly properties: { readonly name: typeof str._schema };

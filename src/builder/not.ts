@@ -1,13 +1,14 @@
-import { SchemaBuilder, type AnySchemaBuilder } from "./base";
 import type { AnySchemaOrAnnotation } from "../schema/types";
+import { type AnySchemaBuilder, SchemaBuilder } from "./base";
 
-export class NotSchemaBuilder<
+export class NotSchemaBuilder<Input, Output> extends SchemaBuilder<
   Input,
+  AnySchemaOrAnnotation,
   Output
-> extends SchemaBuilder<Input, AnySchemaOrAnnotation, Output> {}
+> {}
 
 export function not<const S extends AnySchemaBuilder>(
-  schema: S
+  schema: S,
 ): NotSchemaBuilder<unknown, Exclude<unknown, S["_output"]>> {
   return new NotSchemaBuilder({
     not: schema.schema,

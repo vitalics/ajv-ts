@@ -1,12 +1,12 @@
+import type { IsInteger, IsNegative } from "type-fest";
 import { NumberSchema } from "../schema/types";
 import type { Create } from "./array";
 import type { Reverse } from "./string";
-import type { IsInteger, IsNegative } from "type-fest";
 
 /** `T > U` */
 export type GreaterThan<
   T extends number,
-  U extends number
+  U extends number,
 > = Create<U> extends [...Create<T>, ...infer _] ? false : true;
 /** `T >= U` */
 export type GreaterThanOrEqual<T extends number, U extends number> = Equal<
@@ -27,7 +27,7 @@ export type LessThan<T extends number, U extends number> = GreaterThanOrEqual<
 /** `T === U` */
 export type Equal<
   T extends number,
-  U extends number
+  U extends number,
 > = Create<U>["length"] extends Create<T>["length"] ? true : false;
 
 /** `T !== U` */
@@ -49,8 +49,8 @@ export type LessThanOrEqual<T extends number, U extends number> = Equal<
 export type IsFloat<N extends number | string> = N extends number
   ? IsFloat<`${N}`>
   : N extends `${number}.${number extends 0 ? "" : number}`
-  ? true
-  : false;
+    ? true
+    : false;
 export type IsPositiveInteger<N extends number> = IsInteger<N> extends true
   ? IsNegative<N> extends false
     ? true
@@ -61,7 +61,7 @@ export type Negative<N extends number> =
 
 export type IsNumberSubset<
   N1 extends number,
-  N2 extends number
+  N2 extends number,
 > = GreaterThanOrEqual<N1, N2> extends false
   ? LessThanOrEqual<N1, N2> extends false
     ? true
@@ -71,8 +71,8 @@ export type IsNumberSubset<
 export type NumericStringifyType<N extends number> = IsFloat<N> extends true
   ? "Float"
   : IsInteger<N> extends true
-  ? "Int"
-  : "Unknown";
+    ? "Int"
+    : "Unknown";
 
 type ParseInt<T extends string> = T extends `${infer Digit extends number}`
   ? Digit
@@ -83,8 +83,8 @@ type ReverseString<S extends string> = S extends `${infer First}${infer Rest}`
 type RemoveLeadingZeros<S extends string> = S extends "0"
   ? S
   : S extends `${"0"}${infer R}`
-  ? RemoveLeadingZeros<R>
-  : S;
+    ? RemoveLeadingZeros<R>
+    : S;
 
 type InternalPlusOne<S extends string> =
   S extends `${infer Digit extends number}${infer Rest}`
@@ -109,11 +109,11 @@ export type PlusOne<T extends number> = ParseInt<
 export type Plus<
   T1 extends number,
   T2 extends number,
-  Result extends number = T1
+  Result extends number = T1,
 > = T2 extends 0 ? Result : Plus<MinusOne<T1>, MinusOne<T2>, PlusOne<Result>>;
 
 export type Minus<
   T1 extends number,
   T2 extends number,
-  Result extends number = T1
+  Result extends number = T1,
 > = T2 extends 0 ? Result : Minus<MinusOne<T1>, MinusOne<T2>, MinusOne<Result>>;

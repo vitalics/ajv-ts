@@ -1,10 +1,12 @@
-import { assertType, test } from "vitest";
 import { expectTypeOf } from "expect-type";
+import { assertType, test } from "vitest";
 import s from "../src";
 
 test("boolean default schema", () => {
   const b = s.boolean();
-  assertType<{ readonly type: "boolean"; readonly const: undefined }>(b._schema);
+  assertType<{ readonly type: "boolean"; readonly const: undefined }>(
+    b._schema,
+  );
   expectTypeOf<typeof b._output>().toEqualTypeOf<boolean>();
 });
 

@@ -1,21 +1,21 @@
-import type { Merge, SetRequired, OmitIndexSignature } from "type-fest";
+import type { Merge, OmitIndexSignature, SetRequired } from "type-fest";
 import type { AnySchemaOrAnnotation, ObjectSchema } from "../schema/types";
-import { type AnySchemaBuilder, SchemaBuilder } from "./base";
-import type {
-  Prettify,
-  OptionalUndefined,
-  OptionalByKey,
-  RequiredByKeys,
-  InferKeys,
-  OmitMany,
-  ObjectKeys,
-} from "../types/object";
-import type { ExcludeArr } from "../types/array";
-import type { InferOutputType } from "./types";
-import { makeEnum } from "./enum";
 import type { UnionToTuple } from "../types";
+import type { ExcludeArr } from "../types/array";
+import type {
+  InferKeys,
+  ObjectKeys,
+  OmitMany,
+  OptionalByKey,
+  OptionalUndefined,
+  Prettify,
+  RequiredByKeys,
+} from "../types/object";
 import { array } from "./array";
 import type { ArraySchemaBuilder } from "./array";
+import { type AnySchemaBuilder, SchemaBuilder } from "./base";
+import { makeEnum } from "./enum";
+import type { InferOutputType } from "./types";
 
 export type ObjectDefinition = {
   [key: string]: AnySchemaBuilder;
@@ -33,7 +33,7 @@ class ObjectSchemaBuilder<
       }>,
   const Output = OptionalUndefined<{
     [P in ObjectKeys<Input>]: InferOutputType<Input[P]>;
-  }>
+  }>,
 > extends SchemaBuilder<Input, Schema, Output> {
   protected def: Input = {} as Input;
   constructor(def?: Input) {
@@ -43,7 +43,6 @@ class ObjectSchemaBuilder<
     } as never);
     if (def) {
       this.def = def;
-      // biome-ignore lint/complexity/noForEach: <explanation>
       Object.entries(def).forEach(([key, d]) => {
         if (!this.schema.properties) {
           this.schema.properties = {};
@@ -89,7 +88,6 @@ class ObjectSchemaBuilder<
     Prettify<Pick<Schema, "type"> & Omit<Schema, "required">>,
     OptionalUndefined<Partial<Output>>
   > {
-    // biome-ignore lint/performance/noDelete: <explanation>
     delete (this.schema as Record<string, unknown>).required;
     return this as never;
   }
@@ -118,7 +116,7 @@ class ObjectSchemaBuilder<
    */
   partialFor<
     const Keys extends readonly Key[],
-    const Key extends keyof Output = keyof Output
+    const Key extends keyof Output = keyof Output,
   >(
     ...keys: Keys
   ): ObjectSchemaBuilder<
@@ -129,7 +127,7 @@ class ObjectSchemaBuilder<
         ([
           Schema extends { readonly required: readonly string[] }
             ? Readonly<ExcludeArr<Schema["required"], Keys[number]>>
-            : readonly []
+            : readonly [],
         ] extends [readonly []]
           ? {}
           : {
@@ -146,10 +144,9 @@ class ObjectSchemaBuilder<
     // remove element from array. e.g. "email" for ['name', 'email'] => ['name']
     // opposite of push
     const filtered = required.filter(
-      (key) => !(keys as readonly string[]).includes(key)
+      (key) => !(keys as readonly string[]).includes(key),
     );
     if (filtered.length === 0) {
-      // biome-ignore lint/performance/noDelete: <explanation>
       delete (this.schema as Record<string, unknown>).required;
     } else {
       this.schema.required = [...new Set(filtered)];
@@ -197,9 +194,9 @@ class ObjectSchemaBuilder<
   dependentRequired<
     const Deps extends {
       readonly [K in keyof Output]?: readonly Exclude<keyof Output, K>[];
-    }
+    },
   >(
-    dependencies: Deps
+    dependencies: Deps,
   ): ObjectSchemaBuilder<
     Input,
     Prettify<
@@ -215,9 +212,9 @@ class ObjectSchemaBuilder<
   >;
   dependentRequired<
     const Key extends keyof Output,
-    const Deps extends Record<Key, readonly Exclude<keyof Output, Key>[]>
+    const Deps extends Record<Key, readonly Exclude<keyof Output, Key>[]>,
   >(
-    dependencies: Deps
+    dependencies: Deps,
   ): ObjectSchemaBuilder<
     Input,
     Prettify<
@@ -229,7 +226,7 @@ class ObjectSchemaBuilder<
     Output
   >;
   dependentRequired(
-    dependencies: Record<string, readonly string[]>
+    dependencies: Record<string, readonly string[]>,
   ): ObjectSchemaBuilder<Input, any, any> {
     this.schema.dependentRequired = dependencies as never;
     return this as never;
@@ -266,7 +263,7 @@ class ObjectSchemaBuilder<
    */
   requiredFor<
     const KeyArr extends readonly Key[],
-    const Key extends keyof Schema["properties"] = keyof Schema["properties"]
+    const Key extends keyof Schema["properties"] = keyof Schema["properties"],
   >(
     ...keys: KeyArr
   ): ObjectSchemaBuilder<
@@ -325,7 +322,6 @@ class ObjectSchemaBuilder<
       ...new Set([...(this.schema.required ?? []), ...allProperties]),
     ];
     if (required.length === 0) {
-      // biome-ignore lint/performance/noDelete: <explanation>
       delete (this.schema as Record<string, unknown>).required;
     } else {
       this.schema.required = required;
@@ -341,7 +337,7 @@ class ObjectSchemaBuilder<
    * @see {@link ObjectSchemaBuilder.strict strict}
    */
   rest<const S extends AnySchemaBuilder>(
-    def: S
+    def: S,
   ): ObjectSchemaBuilder<
     Input,
     Prettify<
@@ -370,7 +366,7 @@ class ObjectSchemaBuilder<
    * type C = s.infer<typeof c> // {num: number; str: string}
    */
   merge<const ObjSchema extends ObjectSchemaBuilder<any, any, any>>(
-    schema: ObjSchema
+    schema: ObjSchema,
   ): ObjectSchemaBuilder<
     Merge<Input, ObjSchema["_input"]>,
     Merge<Schema, ObjSchema["_schema"]> & ObjectSchema,
@@ -387,11 +383,10 @@ class ObjectSchemaBuilder<
     const a = object();
     a.schema = Object.assign({}, this.schema) as never;
     const props = (a.schema as ObjectSchema).properties ?? {};
-    // biome-ignore lint/complexity/noForEach: <explanation>
     Object.entries(schema.def as Record<string, AnySchemaBuilder>).forEach(
       ([key, def]) => {
         props[key] = def.schema;
-      }
+      },
     );
     (a.schema as ObjectSchema).properties = props;
     a.def = { ...this.def, ...schema.def };
@@ -403,7 +398,7 @@ class ObjectSchemaBuilder<
    * Alias for {@link merge}.
    */
   and<const ObjSchema extends ObjectSchemaBuilder<any, any, any>>(
-    schema: ObjSchema
+    schema: ObjSchema,
   ): ObjectSchemaBuilder<
     Merge<Input, ObjSchema["_input"]>,
     Merge<Schema, ObjSchema["_schema"]> & ObjectSchema,
@@ -420,7 +415,7 @@ class ObjectSchemaBuilder<
    * type C = s.infer<typeof c> // {num: number; str: string}
    */
   extend<const ObjDef extends ObjectDefinition = ObjectDefinition>(
-    def: ObjDef
+    def: ObjDef,
   ): ObjectSchemaBuilder<
     Merge<Input, ObjDef>,
     Prettify<
@@ -441,7 +436,6 @@ class ObjectSchemaBuilder<
     const a = object();
     a.schema = Object.assign({}, this.schema) as never;
     const props = (a.schema as ObjectSchema).properties ?? {};
-    // biome-ignore lint/complexity/noForEach: <explanation>
     Object.entries(def).forEach(([key, def]) => {
       props[key] = def.schema;
     });
@@ -486,7 +480,7 @@ class ObjectSchemaBuilder<
    */
   pick<
     K extends keyof Output & keyof Input,
-    const Keys extends readonly K[] = K[]
+    const Keys extends readonly K[] = K[],
   >(
     ...keys: Keys
   ): ObjectSchemaBuilder<
@@ -581,19 +575,16 @@ class ObjectSchemaBuilder<
    */
   keyof<
     const Key extends keyof Input & (string | number) = keyof Input &
-      (string | number)
+      (string | number),
   >() {
     return makeEnum<Key, Key[], UnionToTuple<Key>>(
-      Object.keys(this.def) as Key[]
+      Object.keys(this.def) as Key[],
     );
   }
 }
 
-// biome-ignore lint/complexity/noBannedTypes: <explanation>
-export function object<
-  const Definitions extends ObjectDefinition | {} = {}
->(
-  def?: Definitions
+export function object<const Definitions extends ObjectDefinition | {} = {}>(
+  def?: Definitions,
 ) {
   return new ObjectSchemaBuilder<Definitions>(def);
 }

@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { assertType, expect, expectTypeOf, test } from "vitest";
 
-import { assertEqualType } from "../src/utils";
 import s from "../src";
+import { assertEqualType } from "../src/utils";
 
 const Test = s.object({
   f1: s.number(),
@@ -383,7 +383,7 @@ test("optional properties", () => {
   type T = s.infer<typeof Test>;
 
   assertType<T>({
-    qwe: 'qwe',
+    qwe: "qwe",
     zxc: 1,
   } as never);
 });
@@ -398,8 +398,7 @@ test("object accepts type as generic", () => {
   assertEqualType<MyObj, s.infer<typeof Schema>>(true);
 });
 
-test('#57 merge() should not contains undefined after merge', () => {
-
+test("#57 merge() should not contains undefined after merge", () => {
   const AjvVehicleSchema = s.object({
     make: s.string(),
     model: s.string(),
@@ -417,61 +416,68 @@ test('#57 merge() should not contains undefined after merge', () => {
   type AjvTruck = s.infer<typeof AjvTruckSchema>;
 
   const resp = AjvTruckSchema.safeParse({
-    make: 'Bugatti',
-    model: 'Model T',
+    make: "Bugatti",
+    model: "Model T",
     year: 2020,
     commercialCapacity: 1000,
     forwardCabin: true,
-    wheels: 4
-  })
-  expect(resp.success).toBe(true)
+    wheels: 4,
+  });
+  expect(resp.success).toBe(true);
 
-  expect(AjvTruckSchema.schema).toMatchObject(
-    {
-      type: 'object',
-      properties: {
-        commercialCapacity: { type: 'number' },
-        forwardCabin: { type: 'boolean' },
-        wheels: { type: 'number' },
-        make: { type: 'string' },
-        model: { type: 'string' },
-        year: { type: 'number' },
-      }
-    })
+  expect(AjvTruckSchema.schema).toMatchObject({
+    type: "object",
+    properties: {
+      commercialCapacity: { type: "number" },
+      forwardCabin: { type: "boolean" },
+      wheels: { type: "number" },
+      make: { type: "string" },
+      model: { type: "string" },
+      year: { type: "number" },
+    },
+  });
   assertType<AjvTruck>({
-    make: 'Bugatti',
-    model: 'Model T',
+    make: "Bugatti",
+    model: "Model T",
     year: 2020,
     commercialCapacity: 1000,
     forwardCabin: true,
-    wheels: 4
-  })
-})
+    wheels: 4,
+  });
+});
 
-test('#61 optional nullable object schema should parsed successfully', () => {
+test("#61 optional nullable object schema should parsed successfully", () => {
   const optionalNullableObj = s.object({
-    sex: s.enum(['male', 'female']).nullable().optional(),
+    sex: s.enum(["male", "female"]).nullable().optional(),
   });
 
   expect(optionalNullableObj.parse({})).toStrictEqual({});
-  expect(optionalNullableObj.parse({ sex: 'male' })).toStrictEqual({ sex: 'male' });
+  expect(optionalNullableObj.parse({ sex: "male" })).toStrictEqual({
+    sex: "male",
+  });
   expect(optionalNullableObj.parse({ sex: null })).toStrictEqual({ sex: null });
-})
+});
 
-test('#61 should parse big schema successfully', () => {
-  const schema2 = s.object({
-    name: s.string().minLength(2).maxLength(20),
-    age: s.number().integer().min(0).max(100),
+test("#61 should parse big schema successfully", () => {
+  const schema2 = s
+    .object({
+      name: s.string().minLength(2).maxLength(20),
+      age: s.number().integer().min(0).max(100),
 
-    // default optional - string | null | undefined
-    email: s.string().format('email').nullable().optional().default(null),
+      // default optional - string | null | undefined
+      email: s.string().format("email").nullable().optional().default(null),
 
-    //optional - string | null | undefined
-    phone: s.string().nullable().optional(),
+      //optional - string | null | undefined
+      phone: s.string().nullable().optional(),
 
-    // required - string | null
-    surname: s.string().nullable(),
-  }).strict();
+      // required - string | null
+      surname: s.string().nullable(),
+    })
+    .strict();
 
-  expect(schema2.parse({ name: 'Alex', age: 10, })).toStrictEqual({ name: 'Alex', age: 10, email: null });
-})
+  expect(schema2.parse({ name: "Alex", age: 10 })).toStrictEqual({
+    name: "Alex",
+    age: 10,
+    email: null,
+  });
+});

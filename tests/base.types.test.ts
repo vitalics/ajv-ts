@@ -1,6 +1,6 @@
-import { assertType, test } from "vitest";
-import { expectTypeOf } from "expect-type";
 import Ajv from "ajv";
+import { expectTypeOf } from "expect-type";
+import { assertType, test } from "vitest";
 import s from "../src";
 
 test("infer and input helpers match output", () => {
@@ -25,7 +25,10 @@ test("create produces a builder with the given ajv instance", () => {
 
 test("examples adds annotation", () => {
   const str = s.string().examples("a", "b");
-  assertType<{ readonly type: "string"; readonly examples: readonly ["a", "b"] }>(str._schema);
+  assertType<{
+    readonly type: "string";
+    readonly examples: readonly ["a", "b"];
+  }>(str._schema);
 });
 
 test("meta keeps the same schema type", () => {
@@ -35,7 +38,10 @@ test("meta keeps the same schema type", () => {
 
 test("error adds errorMessage", () => {
   const str = s.string().error("bad");
-  assertType<{ readonly type: "string"; readonly errorMessage: string | Record<string, unknown> }>(str._schema);
+  assertType<{
+    readonly type: "string";
+    readonly errorMessage: string | Record<string, unknown>;
+  }>(str._schema);
 });
 
 test("default narrows output", () => {
@@ -66,8 +72,13 @@ test("async/sync do not change schema type", () => {
 });
 
 test("fromJSON merges extra schema properties", () => {
-  const merged = s.fromJSON({ type: "string", title: "Example" } as never, s.string());
-  assertType<{ readonly type: "string"; readonly title: string }>(merged._schema);
+  const merged = s.fromJSON(
+    { type: "string", title: "Example" } as never,
+    s.string(),
+  );
+  assertType<{ readonly type: "string"; readonly title: string }>(
+    merged._schema,
+  );
 });
 
 test("schema and shape getters return the same type", () => {

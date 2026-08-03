@@ -1,19 +1,19 @@
 import Ajv from "ajv";
 
 import { array } from "./array";
+import { type AnySchemaBuilder, SchemaBuilder } from "./base";
 import { bool } from "./boolean";
+import { constant, literal } from "./constant";
+import { makeEnum } from "./enum";
+import { never, not } from "./not";
 import { nil } from "./null";
 import { int, integer, number } from "./number";
 import { object } from "./object";
 import { string } from "./string";
 import { or } from "./union";
-import { makeEnum } from "./enum";
-import { SchemaBuilder, type AnySchemaBuilder } from "./base";
-import { constant, literal } from "./constant";
-import { never, not } from "./not";
 
-import type { InferSchemaType, InferOutputType } from "./types";
 import type { AnySchemaOrAnnotation } from "../schema/types";
+import type { InferOutputType, InferSchemaType } from "./types";
 
 class UnknownSchemaBuilder<T extends unknown | any> extends SchemaBuilder<
   T,
@@ -39,12 +39,14 @@ function unknown(): SchemaBuilder<unknown, AnySchemaOrAnnotation, unknown> {
 
 function fromJSON(
   schema: AnySchemaOrAnnotation,
-  defaults?: AnySchemaBuilder
+  defaults?: AnySchemaBuilder,
 ): AnySchemaBuilder {
   const merged = defaults
     ? { ...(defaults.schema as object), ...(schema as object) }
     : schema;
-  return new UnknownSchemaBuilder(merged as AnySchemaOrAnnotation) as AnySchemaBuilder;
+  return new UnknownSchemaBuilder(
+    merged as AnySchemaOrAnnotation,
+  ) as AnySchemaBuilder;
 }
 
 type Api = {
@@ -84,16 +86,23 @@ function create(ajv: Ajv): Api {
     int: () => withAjv(int(), ajv),
     integer: () => withAjv(integer(), ajv),
     number: () => withAjv(number(), ajv),
-    object: (def?: Parameters<typeof object>[0]) => withAjv(object(def as never), ajv),
-    or: (...args: Parameters<typeof or>) => withAjv(or(...args) as unknown as AnySchemaBuilder, ajv),
-    union: (...args: Parameters<typeof or>) => withAjv(or(...args) as unknown as AnySchemaBuilder, ajv),
+    object: (def?: Parameters<typeof object>[0]) =>
+      withAjv(object(def as never), ajv),
+    or: (...args: Parameters<typeof or>) =>
+      withAjv(or(...args) as unknown as AnySchemaBuilder, ajv),
+    union: (...args: Parameters<typeof or>) =>
+      withAjv(or(...args) as unknown as AnySchemaBuilder, ajv),
     string: () => withAjv(string(), ajv),
     unknown: () => withAjv(unknown(), ajv),
-    enum: (...args: Parameters<typeof makeEnum>) => withAjv(makeEnum(...args) as unknown as AnySchemaBuilder, ajv),
-    const: (value: Parameters<typeof constant>[0]) => withAjv(constant(value), ajv),
-    literal: (value: Parameters<typeof literal>[0]) => withAjv(literal(value), ajv),
+    enum: (...args: Parameters<typeof makeEnum>) =>
+      withAjv(makeEnum(...args) as unknown as AnySchemaBuilder, ajv),
+    const: (value: Parameters<typeof constant>[0]) =>
+      withAjv(constant(value), ajv),
+    literal: (value: Parameters<typeof literal>[0]) =>
+      withAjv(literal(value), ajv),
     never: () => withAjv(never() as unknown as AnySchemaBuilder, ajv),
-    not: (schema: Parameters<typeof not>[0]) => withAjv(not(schema) as unknown as AnySchemaBuilder, ajv),
+    not: (schema: Parameters<typeof not>[0]) =>
+      withAjv(not(schema) as unknown as AnySchemaBuilder, ajv),
     fromJSON: (schema: AnySchemaOrAnnotation) => withAjv(fromJSON(schema), ajv),
   };
 }
@@ -102,7 +111,9 @@ function keyof<const T extends AnySchemaBuilder>(schema: T): AnySchemaBuilder {
   if (schema.schema.type !== "object") {
     throw new TypeError("keyof only supports object schemas");
   }
-  const properties = (schema.schema as { properties?: Record<string, unknown> }).properties ?? {};
+  const properties =
+    (schema.schema as { properties?: Record<string, unknown> }).properties ??
+    {};
   const keys = Object.keys(properties);
   return or(...keys.map((k) => constant(k)));
 }

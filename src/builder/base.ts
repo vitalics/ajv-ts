@@ -1,7 +1,7 @@
+import type { StandardSchemaV1 } from "@standard-schema/spec";
 import Ajv, { type ErrorObject } from "ajv";
 import ajvErrors from "ajv-errors";
 import addFormats from "ajv-formats";
-import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { AnySchema, AnySchemaOrAnnotation } from "../schema/types";
 import type { TError } from "../types/errors";
@@ -18,7 +18,7 @@ export type SafeParseSuccessResult<T> = {
 };
 export type SafeParseErrorResult<
   T,
-  E extends Error | TError | string = Error
+  E extends Error | TError | string = Error,
 > = {
   success: false;
   error: E;
@@ -40,11 +40,10 @@ export const DEFAULT_AJV = ajvErrors(
     new Ajv({
       allErrors: true,
       useDefaults: true,
-    } as never) as never
-  ) as never
+    } as never) as never,
+  ) as never,
 );
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 export type AnySchemaBuilder = SchemaBuilder<any, any, any>;
 
 /**
@@ -73,7 +72,7 @@ function toStandardIssues(error: Error): StandardSchemaV1.Issue[] {
 export abstract class SchemaBuilder<
   const Input,
   const Schema extends AnySchemaOrAnnotation = AnySchemaOrAnnotation,
-  const Output = Input
+  const Output = Input,
 > {
   declare _input: Input;
   declare _output: Output;
@@ -83,7 +82,10 @@ export abstract class SchemaBuilder<
   private _postFns: ((value: unknown) => unknown)[] = [];
   private _refineFns: ((value: unknown) => unknown)[] = [];
 
-  constructor(schema: Schema, private _ajv: Ajv = DEFAULT_AJV) {
+  constructor(
+    schema: Schema,
+    private _ajv: Ajv = DEFAULT_AJV,
+  ) {
     this._schema = schema;
   }
 
@@ -162,7 +164,7 @@ export abstract class SchemaBuilder<
    */
   examples<
     const T = Output,
-    const Examples extends readonly unknown[] = readonly T[]
+    const Examples extends readonly unknown[] = readonly T[],
   >(
     ...examples: Examples
   ): SchemaBuilder<Input, Schema & { readonly examples: Examples }, Output> {
@@ -202,7 +204,10 @@ export abstract class SchemaBuilder<
   /**
    * Postprocess the validated output value.
    */
-  postprocess(fn: (value: Output) => unknown, _schema?: AnySchemaBuilder): this {
+  postprocess(
+    fn: (value: Output) => unknown,
+    _schema?: AnySchemaBuilder,
+  ): this {
     if (typeof fn !== "function") {
       throw new TypeError("postprocess must be a function");
     }
@@ -249,8 +254,12 @@ export abstract class SchemaBuilder<
    * numberSchema.parse('qwe') // error: Not a number
    */
   error(
-    messageOrOptions: string | Record<string, unknown>
-  ): SchemaBuilder<Input, Schema & { readonly errorMessage: typeof messageOrOptions }, Output> {
+    messageOrOptions: string | Record<string, unknown>,
+  ): SchemaBuilder<
+    Input,
+    Schema & { readonly errorMessage: typeof messageOrOptions },
+    Output
+  > {
     (this.schema as Record<string, unknown>).errorMessage = messageOrOptions;
     return this as never;
   }
@@ -281,7 +290,7 @@ export abstract class SchemaBuilder<
    */
   custom<const K extends string, const V = unknown>(
     key: K,
-    value: V
+    value: V,
   ): this & SchemaBuilder<Input, Schema & Record<K, V>, Output> {
     (this.schema as Record<string, unknown>)[key] = value;
     return this as never;
@@ -305,7 +314,7 @@ export abstract class SchemaBuilder<
    * Person.parse({}) // { age: 18 }
    */
   default<const T extends Output = Output>(
-    value: T
+    value: T,
   ): SchemaBuilder<
     Input,
     Schema & {
@@ -388,9 +397,14 @@ export abstract class SchemaBuilder<
       nextType = [...new Set([...currentType, "null"])];
     } else if (typeof currentType === "string") {
       nextType = [...new Set([currentType, "null"])];
-    } else if ("enum" in current && Array.isArray((current as { enum?: unknown }).enum)) {
+    } else if (
+      "enum" in current &&
+      Array.isArray((current as { enum?: unknown }).enum)
+    ) {
       const enumTypes = new Set<string>();
-      for (const value of (current as { enum: (string | number | boolean | object)[] }).enum) {
+      for (const value of (
+        current as { enum: (string | number | boolean | object)[] }
+      ).enum) {
         if (typeof value === "string") enumTypes.add("string");
         else if (typeof value === "number") enumTypes.add("number");
         else if (typeof value === "boolean") enumTypes.add("boolean");
@@ -402,6 +416,16 @@ export abstract class SchemaBuilder<
       anyOf: [this.schema, { type: "null" }],
       ...(nextType !== undefined ? { type: nextType } : {}),
     } as never) as never;
+  }
+
+  /** marks schema as `deprecated:true` property */
+  deprecated(): SchemaBuilder<
+    Input,
+    Schema & { readonly deprecated: true },
+    Output
+  > {
+    (this.schema as any).deprecated = true;
+    return this as never;
   }
 
   protected _safeParseRaw(input?: unknown): SafeParseResult<unknown> {
@@ -507,23 +531,24 @@ export abstract class SchemaBuilder<
 class NullableSchemaBuilder<
   const Input,
   const Schema extends AnySchemaOrAnnotation,
-  const Output
+  const Output,
 > extends SchemaBuilder<Input, Schema, Output> {}
 
 /**
  * Concrete schema builder produced by {@link SchemaBuilder.not not} method.
  */
-export class NotSchemaBuilder<
-  const Input,
-  const Output
-> extends SchemaBuilder<Input, AnySchemaOrAnnotation, Output> {}
+export class NotSchemaBuilder<const Input, const Output> extends SchemaBuilder<
+  Input,
+  AnySchemaOrAnnotation,
+  Output
+> {}
 
 export type Infer<S extends AnySchemaBuilder> = S["_output"];
 export type GetSchema<S extends AnySchemaBuilder> = S["_schema"];
 
 export type SchemaToBuilder<
   Sb extends AnySchemaBuilder,
-  S extends AnySchemaOrAnnotation = GetSchema<Sb>
+  S extends AnySchemaOrAnnotation = GetSchema<Sb>,
 > = unknown;
 
 type SchemaObjectToType<S extends AnySchemaOrAnnotation> = S extends {
@@ -532,17 +557,17 @@ type SchemaObjectToType<S extends AnySchemaOrAnnotation> = S extends {
   ? S["type"] extends number
     ? number
     : S["type"] extends "string"
-    ? string
-    : S["type"] extends "null"
-    ? null
-    : // S['type'] extends 'object' ? Record<any, any> :
-    // S extends { type: 'array' }? :
-    S extends {
-        type: "object";
-        properties?: Record<string, AnySchemaOrAnnotation>;
-      }
-    ? S["properties"][keyof S["properties"]]
-    : [unknown, "not matched"]
+      ? string
+      : S["type"] extends "null"
+        ? null
+        : // S['type'] extends 'object' ? Record<any, any> :
+          // S extends { type: 'array' }? :
+          S extends {
+              type: "object";
+              properties?: Record<string, AnySchemaOrAnnotation>;
+            }
+          ? S["properties"][keyof S["properties"]]
+          : [unknown, "not matched"]
   : [unknown, "end"];
 // export type SchemaToType<
 //   Sb extends AnySchemaBuilder,

@@ -1,6 +1,6 @@
-import { test } from 'vitest'
+import { test } from "vitest";
 
-import { s } from '../src'
+import { s } from "../src";
 
 test("Should have error messages appropriate for the underlying type", () => {
   s.string().minLength(2).nullable().parse(null);

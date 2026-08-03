@@ -5,14 +5,14 @@ import type {
   SetOptional,
 } from "type-fest";
 import type { StringSchema } from "../schema/types";
-import { SchemaBuilder, type AnySchemaBuilder } from "./base";
 import { ArraySchemaBuilder } from "./array";
 import { array } from "./array";
+import { type AnySchemaBuilder, SchemaBuilder } from "./base";
 
-import type { OmitMany, Prettify } from "../types/object";
-import type { IsPositiveInteger } from "../types/number";
-import type { OmitUndefined } from "../types/object";
 import type { TRangeError, TTypeError } from "../types/errors";
+import type { IsPositiveInteger } from "../types/number";
+import type { OmitMany, Prettify } from "../types/object";
+import type { OmitUndefined } from "../types/object";
 
 type StringFormat = StringSchema["format"];
 
@@ -38,7 +38,7 @@ class StringSchemaBuilder<
       readonly const: undefined;
     }>
   >,
-  const Opts extends StringSchemaOpts = DefaultStringOpts
+  const Opts extends StringSchemaOpts = DefaultStringOpts,
 > extends SchemaBuilder<string, Schema, Input> {
   constructor(schema?: SetOptional<Schema, "type">) {
     super({ ...schema, type: "string" } as never);
@@ -82,7 +82,7 @@ class StringSchemaBuilder<
    * const str2 = prefixS.parse("S_Some") // OK
    */
   pattern<const Pattern extends string | RegExp = string | RegExp>(
-    pattern: Pattern
+    pattern: Pattern,
   ): StringSchemaBuilder<
     Input,
     Prettify<
@@ -100,7 +100,7 @@ class StringSchemaBuilder<
   }
 
   const<const V extends string>(
-    value: V
+    value: V,
   ): StringSchemaBuilder<
     V,
     Prettify<
@@ -120,7 +120,7 @@ class StringSchemaBuilder<
    * res.schema // { type: 'string', not: { const: 'Jerry' } }
    */
   exclude<const S extends AnySchemaBuilder>(
-    schema: S
+    schema: S,
   ): StringSchemaBuilder<
     Exclude<Input, S["_output"]>,
     Prettify<
@@ -146,13 +146,13 @@ class StringSchemaBuilder<
     Valid = IsPositiveInteger<L>,
     MinLengthValid = Opts["maxLength"] extends number
       ? GreaterThan<Opts["maxLength"], L>
-      : true
+      : true,
   >(
     value: Valid extends true
       ? MinLengthValid extends true
         ? L
         : TRangeError<`MinLength are greater than MaxLength. MinLength: ${L}. MaxLength: ${Opts["maxLength"]}`>
-      : TTypeError<`Only Positive and non floating numbers are supported. Received: '${L}'`>
+      : TTypeError<`Only Positive and non floating numbers are supported. Received: '${L}'`>,
   ): StringSchemaBuilder<
     Input,
     Prettify<
@@ -187,13 +187,13 @@ class StringSchemaBuilder<
     Valid = IsPositiveInteger<L>,
     MinLengthValid = Opts["minLength"] extends number
       ? GreaterThan<L, Opts["minLength"]>
-      : true
+      : true,
   >(
     value: Valid extends true
       ? MinLengthValid extends true
         ? L
         : TRangeError<`MinLength are greater than MaxLength. MinLength: ${Opts["minLength"]}. MaxLength: ${L}`>
-      : TTypeError<`Expected positive integer. Received: '${L}'`>
+      : TTypeError<`Expected positive integer. Received: '${L}'`>,
   ): StringSchemaBuilder<
     Input,
     Prettify<
@@ -233,7 +233,7 @@ class StringSchemaBuilder<
   length<const L extends number, Valid = IsPositiveInteger<L>>(
     value: Valid extends true
       ? L
-      : TTypeError<`Expected positive integer. Received: '${L}'`>
+      : TTypeError<`Expected positive integer. Received: '${L}'`>,
   ): StringSchemaBuilder<
     Input,
     Prettify<
@@ -245,10 +245,15 @@ class StringSchemaBuilder<
           }
         >
     >,
-    Prettify<Omit<Opts, "minLength" | "maxLength"> & { readonly minLength: L; readonly maxLength: L }>
+    Prettify<
+      Omit<Opts, "minLength" | "maxLength"> & {
+        readonly minLength: L;
+        readonly maxLength: L;
+      }
+    >
   > {
     return this.maxLength<L>(value as never).minLength<L>(
-      value as never
+      value as never,
     ) as never;
   }
   /**
@@ -292,7 +297,7 @@ class StringSchemaBuilder<
    */
   uuid() {
     return this.format<`${string}-${string}-${string}-${string}-${string}`>(
-      "uuid"
+      "uuid",
     );
   }
   /**
@@ -338,9 +343,9 @@ class StringSchemaBuilder<
 
   format<
     const S extends string = Input,
-    const Format extends StringFormat = StringFormat
+    const Format extends StringFormat = StringFormat,
   >(
-    format: Format
+    format: Format,
   ): StringSchemaBuilder<
     S,
     Prettify<

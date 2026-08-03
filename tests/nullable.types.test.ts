@@ -1,5 +1,5 @@
-import { assertType, test } from "vitest";
 import { expectTypeOf } from "expect-type";
+import { assertType, test } from "vitest";
 import s from "../src";
 
 test("nullable string adds null to output", () => {

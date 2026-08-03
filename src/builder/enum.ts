@@ -6,7 +6,7 @@ type EnumLike = { [k: string]: string | number; [nu: number]: string };
 
 export class EnumSchemaBuilder<
   const Enum extends EnumLike = EnumLike,
-  const Tuple extends Enum[keyof Enum][] = Enum[keyof Enum][]
+  const Tuple extends Enum[keyof Enum][] = Enum[keyof Enum][],
 > extends SchemaBuilder<Tuple, EnumAnnotation, Tuple[number]> {
   private _enum: Record<keyof Enum, unknown> = {} as unknown as Record<
     keyof Enum,
@@ -51,7 +51,7 @@ export class NativeEnumSchemaBuilder<T extends EnumLike> extends SchemaBuilder<
  * handle `enum` typescript type to make `enum` JSON annotation
  */
 export function makeEnum<E extends EnumLike = EnumLike>(
-  enumLike: E
+  enumLike: E,
 ): EnumSchemaBuilder<E, E[keyof E][]>;
 /**
  * handle tuple(array) of possible values to make `enum` JSON annotation
@@ -59,9 +59,9 @@ export function makeEnum<E extends EnumLike = EnumLike>(
 export function makeEnum<
   const P extends string | number = string | number,
   const T extends P[] | readonly P[] = [],
-  const U extends UnionToTuple<T[number]> = UnionToTuple<T[number]>
+  const U extends UnionToTuple<T[number]> = UnionToTuple<T[number]>,
 >(
-  possibleValues: T
+  possibleValues: T,
 ): EnumSchemaBuilder<
   { [K in Extract<T[number], string>]: K },
   Extract<T[number], string>[]
