@@ -230,12 +230,12 @@ export class ArraySchemaBuilder<
    */
   maxLength<
     const L extends number,
-    const IsValidByMaxLength extends boolean =
-      Schema["maxLength"] extends undefined
-        ? true
-        : Schema["maxLength"] extends number
-          ? LessThan<L, Schema["maxLength"]>
-          : true,
+    const IsValidByMaxLength extends
+      boolean = Schema["maxLength"] extends undefined
+      ? true
+      : Schema["maxLength"] extends number
+        ? LessThan<L, Schema["maxLength"]>
+        : true,
   >(
     value: IsPositiveInteger<L> extends false
       ? TTypeErrorNotSame<
@@ -298,12 +298,12 @@ export class ArraySchemaBuilder<
 
   minLength<
     const L extends number,
-    const IsValidByMaxLength extends boolean =
-      Schema["maxItems"] extends undefined
-        ? true
-        : Schema["maxItems"] extends number
-          ? LessThan<L, Schema["maxItems"]>
-          : true,
+    const IsValidByMaxLength extends
+      boolean = Schema["maxItems"] extends undefined
+      ? true
+      : Schema["maxItems"] extends number
+        ? LessThan<L, Schema["maxItems"]>
+        : true,
   >(
     value: IsPositiveInteger<L> extends false
       ? TTypeErrorNotSame<
